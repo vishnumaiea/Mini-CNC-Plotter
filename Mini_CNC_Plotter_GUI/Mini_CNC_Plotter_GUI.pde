@@ -1,15 +1,15 @@
 
 //=========================================================================//
 
-//   -- Mini CNC Plotter - 21 ---
+//   -- Mini CNC Plotter --
 //
-//   Similar to version 21 but with some minor improvements
+//   Successfully implemented the anti-mirroring function
 //
 //   Author : Vishnu M Aiea
 //   E-Mail : vishnumaiea@gmail.com
 //   Web : www.vishnumaiea.in
 //   Date created : 12:20 PM 27-04-2017, Thursday
-//   Last modified : 03:39:06 PM, 28-05-2017, Sunday
+//   Last modified : 10:38:28 PM, 28-05-2017, Sunday
 
 //=========================================================================//
 
@@ -346,6 +346,7 @@ boolean isPenDown = false;
 boolean ifLines = false;
 boolean ifPoints = false;
 boolean ifFreehand = false;
+boolean ifToMirror = false;
 
 int selectPortValue = -1; //virtual com port value
 int portCount = 0;
@@ -356,7 +357,7 @@ int mouseStatusTemp = 0;
 int tempInt; //int variable for testing
 int comStatusCounter; //to check is the OBU is on and transmitting
 
-String versionNumber = "3.2.45";
+String versionNumber = "1.0.2";
 
 boolean startPressed = false; //for start button
 boolean quitPressed = false; //for quit button
@@ -1473,20 +1474,40 @@ void countLines() {
         }
 
         if ((pixelColor) && ((x==0) || (!prevPixelColor))) { //if pixel color is black AND (there's no prev pixel OR prev pixel is white)
-          lineCords[0][0][lineCount] = x; //x cord of starting of a line
-          lineCords[0][1][lineCount] = y; //y cord of starting of a line
+          if(ifToMirror) {
+            lineCords[0][0][lineCount] = x; //x cord of starting of a line
+            lineCords[0][1][lineCount] = y; //y cord of starting of a line
+          }
+          else if(!ifToMirror) {
+            lineCords[0][0][lineCount] = (imageWidth - 1) - x; //x cord of starting of a line
+            lineCords[0][1][lineCount] = y; //y cord of starting of a line
+          }
         }
 
         if ((!pixelColor) && (prevPixelColor)) { //if pixel color is white AND prev pixel color is black
-          lineCords[1][0][lineCount] = x-1; //x cord of ending of a line
-          lineCords[1][1][lineCount] = y; //y cord of ending of a line
-          lineCount++; // increase z to store the next line's cords
+          if(ifToMirror) {
+            lineCords[1][0][lineCount] = x-1; //x cord of ending of a line
+            lineCords[1][1][lineCount] = y; //y cord of ending of a line
+            lineCount++; // increase z to store the next line's cords
+          }
+          else if (!ifToMirror) {
+            lineCords[1][0][lineCount] = (imageWidth - 1) - (x-1); //x cord of ending of a line
+            lineCords[1][1][lineCount] = y; //y cord of ending of a line
+            lineCount++; // increase z to store the next line's cords
+          }
         }
 
         if ((pixelColor) && (x==(imageWidth-1))) { //if pixel is black but at the end of any row
-          lineCords[1][0][lineCount] = x; //x cord of ending of a line
-          lineCords[1][1][lineCount] = y; //y cord of ending of a line
-          lineCount++; // increase z to store the next line's cords
+          if(ifToMirror) {
+            lineCords[1][0][lineCount] = x; //x cord of ending of a line
+            lineCords[1][1][lineCount] = y; //y cord of ending of a line
+            lineCount++; // increase z to store the next line's cords
+          }
+          else if(!ifToMirror) {
+            lineCords[1][0][lineCount] = (imageWidth - 1) - x; //x cord of ending of a line
+            lineCords[1][1][lineCount] = y; //y cord of ending of a line
+            lineCount++; // increase z to store the next line's cords
+          }
         }
       }
     }

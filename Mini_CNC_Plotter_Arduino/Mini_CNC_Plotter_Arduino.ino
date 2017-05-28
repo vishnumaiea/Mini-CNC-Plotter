@@ -5,11 +5,6 @@
 //  Code for controlling three stepper drives in a CNC
 //  plotter. This uses Arduino Nano 328.
 //
-//  Plotter_Calib_2 - Test Version
-//
-//  Creates points in all four corners in a loop. Helps
-//  to check accuracy or consistency.
-//
 //  Author : Vishnu M Aiea
 //  Web : www.vishnumaiea.in
 //  Date created : 10:48 PM 22-04-2017, Saturday
