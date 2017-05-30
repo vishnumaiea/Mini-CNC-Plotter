@@ -5,3 +5,5 @@ A GUI application designed in Processing for the Mini CNC Plotter I made with sa
 This is what I'm using for developeing the control software : www.processing.org
 
 My project website is at www.vishnumaiea.in
+
+This project will be available at : http://www.vishnumaiea.in/projects/hardware/mini-cnc-plotter
