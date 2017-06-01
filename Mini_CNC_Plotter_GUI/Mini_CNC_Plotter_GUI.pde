@@ -3,13 +3,13 @@
 
 //   -- Mini CNC Plotter --
 //
-//   Successfully implemented the anti-mirroring function
+//   Added new class : labelBox and centered the label values
 //
 //   Author : Vishnu M Aiea
 //   E-Mail : vishnumaiea@gmail.com
 //   Web : www.vishnumaiea.in
 //   Date created : 12:20 PM 27-04-2017, Thursday
-//   Last modified : 10:38:28 PM, 28-05-2017, Sunday
+//   Last modified : 05:49:14 PM, 01-06-2017, Thursday
 
 //=========================================================================//
 
@@ -17,14 +17,13 @@ import processing.serial.*;
 Serial serialPort;
 
 //=========================================================================//
-
 //class definitons
 
 public class uiButton {
   int buttonWidth, buttonHeight, buttonX, buttonY;
   color buttonColor, defaultColor, backupColor, hoverColor, activeColor, pressedColor;
   boolean ifPressed, ifClicked, ifHover, ifActive, mouseStatus;
-  uiLabel linkedLabel;
+  uiButtonLabel linkedLabel;
 
   uiButton (int a, int b, int c, int d, color e, color f, color g, color h) {
     buttonX = a;
@@ -110,7 +109,7 @@ public class uiButton {
     linkedLabel.setColor(a);
   }
 
-  void linkLabel (uiLabel a) {
+  void linkLabel (uiButtonLabel a) {
     linkedLabel = a;
   }
 
@@ -121,7 +120,7 @@ public class uiButton {
 
 //=========================================================================//
 
-public class uiLabel {
+public class uiButtonLabel {
 
   String labelName;
   int labelX, labelY, fontSize;
@@ -129,7 +128,7 @@ public class uiLabel {
   color labelColor, defaultColor, backupColor, hoverColor, pressedColor, activeColor;
   uiButton linkedButton;
 
-  uiLabel(String a, int b, int c, PFont d, int e, color f, color g, color h, color i) {
+  uiButtonLabel(String a, int b, int c, PFont d, int e, color f, color g, color h, color i) {
     labelName = a;
     labelX = b;
     labelY = c;
@@ -176,7 +175,7 @@ public class uiLabel {
     labelX += linkedButton.buttonX;
     labelY += linkedButton.buttonY;
   }
-} //uiLabel class ends
+} //uiButtonLabel class ends
 
 //=========================================================================//
 
@@ -217,6 +216,66 @@ public class textLabel {
     primaryColor = defaultColor;
   }
 } //textLabel class ends
+
+//=========================================================================//
+
+public class labelBox {
+  int width, height, x, y;
+  color primaryColor, backupColor;
+  boolean labelAvailable;
+  textLabel linkedLabel;
+
+  labelBox (int a, int b, int c, int d, color e, textLabel f) { //with associated label text
+    x = a;
+    y = b;
+    width = c;
+    height = d;
+    primaryColor = e;
+    backupColor = e;
+    linkedLabel = f;
+    labelAvailable = true;
+  }
+
+  labelBox (int a, int b, int c, int d, color e) { //without label text
+    x = a;
+    y = b;
+    width = c;
+    height = d;
+    primaryColor = e;
+    backupColor = e;
+    labelAvailable = false;
+  }
+
+  public void display() {
+    fill(primaryColor);
+    rect(x, y, width, height);
+
+    if(labelAvailable) { //only if label is available
+      fill(linkedLabel.primaryColor);
+      textFont(linkedLabel.labelFont, linkedLabel.fontSize);
+      text(linkedLabel.labelName, (((width - textWidth(linkedLabel.labelName))/2) + x), (((height - linkedLabel.fontSize)/2) + (y+11)));
+    }
+  }
+
+  public void setBoxColor (color a) {
+    primaryColor = a;
+  }
+
+  public void setPosition (int a, int b) {
+    x = a;
+    y = b;
+  }
+
+  public void setLabel (String a) {
+    if(labelAvailable) {
+      linkedLabel.labelName = a;
+    }
+  }
+
+  public void reset() {
+    primaryColor = backupColor;
+  }
+} //labelBox class ends
 
 //=========================================================================//
 
@@ -393,15 +452,16 @@ uiButton plotterHomeButton;
 uiButton loadImageButton, linesButton, pointsButton, freehandButton;
 uiButton plotterStartButton, plotterPauseButton, plotterStopButton, plotterCalibrateButton;
 
-uiLabel plotterStartButtonLabel, plotterPauseButtonLabel, plotterResumeButtonLabel, plotterStopButtonLabel, plotterCalibrateButtonLabel;
-uiLabel plotterUpArrow, plotterDownArrow, plotterLeftArrow, plotterRightArrow, plotterPenArrow, plotterPenCircle;
-uiLabel plotterStartIcon, plotterPauseIcon, plotterResumeIcon, plotterStopIcon;
-uiLabel startMainButtonLabel, quitAppButtonLabel, aboutButtonLabel;
-uiLabel loadImageButtonLabel, linesButtonLabel, pointsButtonLabel, freehandButtonLabel;
-uiLabel portDecButtonLabel, portIncButtonLabel, quitMainButtonLabel;
+uiButtonLabel plotterStartButtonLabel, plotterPauseButtonLabel, plotterResumeButtonLabel, plotterStopButtonLabel, plotterCalibrateButtonLabel;
+uiButtonLabel plotterUpArrow, plotterDownArrow, plotterLeftArrow, plotterRightArrow, plotterPenArrow, plotterPenCircle;
+uiButtonLabel plotterStartIcon, plotterPauseIcon, plotterResumeIcon, plotterStopIcon;
+uiButtonLabel startMainButtonLabel, quitAppButtonLabel, aboutButtonLabel;
+uiButtonLabel loadImageButtonLabel, linesButtonLabel, pointsButtonLabel, freehandButtonLabel;
+uiButtonLabel portDecButtonLabel, portIncButtonLabel, quitMainButtonLabel;
 
 
-textLabel fileName;
+textLabel fileName, portNameLabel, currentTask, currentSerialComStatus, currentPlotterStatus, currentPlotterPosition;
+labelBox fileNameBox, portNameBox, serialComStatusBox, plotterStatusBox, plotterPositionBox, currentTaskBox;
 
 //=========================================================================//
 
@@ -420,37 +480,37 @@ void setup() {
 
   //instantiating labels
   //name, X, Y, font, fontSize, labelColor, hoverColor, pressedColor, activeColor, button
-  plotterUpArrow = new uiLabel ("",8, 40, fontAwesome, 40, colorMediumGrey, colorBlue, colorOrange, colorOrange);
-  plotterDownArrow = new uiLabel ("", 8, 40, fontAwesome, 40, colorMediumGrey, colorBlue, colorOrange, colorOrange);
-  plotterLeftArrow = new uiLabel ("", 8, 40, fontAwesome, 40, colorMediumGrey, colorBlue, colorOrange, colorOrange);
-  plotterRightArrow = new uiLabel ("",8, 40, fontAwesome, 40, colorMediumGrey, colorBlue, colorOrange, colorOrange);
-  plotterPenArrow = new uiLabel ("", 18, 35, fontAwesome, 27, colorWhite, colorBlue, colorOrange, colorOrange);
-  plotterPenCircle = new uiLabel ("", 8, 40, fontAwesome, 42, colorMediumGrey, colorBlue, colorOrange, colorOrange);
+  plotterUpArrow = new uiButtonLabel ("",8, 40, fontAwesome, 40, colorMediumGrey, colorBlue, colorOrange, colorOrange);
+  plotterDownArrow = new uiButtonLabel ("", 8, 40, fontAwesome, 40, colorMediumGrey, colorBlue, colorOrange, colorOrange);
+  plotterLeftArrow = new uiButtonLabel ("", 8, 40, fontAwesome, 40, colorMediumGrey, colorBlue, colorOrange, colorOrange);
+  plotterRightArrow = new uiButtonLabel ("",8, 40, fontAwesome, 40, colorMediumGrey, colorBlue, colorOrange, colorOrange);
+  plotterPenArrow = new uiButtonLabel ("", 18, 35, fontAwesome, 27, colorWhite, colorBlue, colorOrange, colorOrange);
+  plotterPenCircle = new uiButtonLabel ("", 8, 40, fontAwesome, 42, colorMediumGrey, colorBlue, colorOrange, colorOrange);
 
-  plotterStartIcon = new uiLabel ("", 15, 22, fontAwesome, 16, colorMediumBlack, colorWhite, colorOrange, colorWhite);
-  plotterPauseIcon = new uiLabel ("", 15, 22, fontAwesome, 16, colorMediumBlack, colorWhite, colorOrange, colorWhite);
-  plotterResumeIcon = new uiLabel ("", 15, 22, fontAwesome, 16, colorMediumBlack, colorWhite, colorOrange, colorWhite);
-  plotterStopIcon = new uiLabel ("", 15, 22, fontAwesome, 16, colorMediumBlack, colorWhite, colorOrange, colorWhite);
+  plotterStartIcon = new uiButtonLabel ("", 15, 22, fontAwesome, 16, colorMediumBlack, colorWhite, colorOrange, colorWhite);
+  plotterPauseIcon = new uiButtonLabel ("", 15, 22, fontAwesome, 16, colorMediumBlack, colorWhite, colorOrange, colorWhite);
+  plotterResumeIcon = new uiButtonLabel ("", 15, 22, fontAwesome, 16, colorMediumBlack, colorWhite, colorOrange, colorWhite);
+  plotterStopIcon = new uiButtonLabel ("", 15, 22, fontAwesome, 16, colorMediumBlack, colorWhite, colorOrange, colorWhite);
 
-  startMainButtonLabel = new uiLabel ("START", 20, 23, segoeFont, 14, colorBlue, colorWhite, colorOrange, colorBlue);
-  quitAppButtonLabel = new uiLabel ("QUIT", 22, 23, segoeFont, 14, colorBlue, colorWhite, colorOrange, colorBlue);
-  aboutButtonLabel = new uiLabel ("ABOUT", 18, 23, segoeFont, 14, colorBlue, colorWhite, colorOrange, colorBlue);
+  startMainButtonLabel = new uiButtonLabel ("START", 20, 23, segoeFont, 14, colorBlue, colorWhite, colorOrange, colorBlue);
+  quitAppButtonLabel = new uiButtonLabel ("QUIT", 22, 23, segoeFont, 14, colorBlue, colorWhite, colorOrange, colorBlue);
+  aboutButtonLabel = new uiButtonLabel ("ABOUT", 18, 23, segoeFont, 14, colorBlue, colorWhite, colorOrange, colorBlue);
 
-  loadImageButtonLabel = new uiLabel ("Load Image", 16, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
-  linesButtonLabel = new uiLabel ("Lines", 36, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
-  pointsButtonLabel = new uiLabel ("Points", 32, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
-  freehandButtonLabel = new uiLabel ("Freehand", 24, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
+  loadImageButtonLabel = new uiButtonLabel ("Load Image", 16, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
+  linesButtonLabel = new uiButtonLabel ("Lines", 36, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
+  pointsButtonLabel = new uiButtonLabel ("Points", 32, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
+  freehandButtonLabel = new uiButtonLabel ("Freehand", 24, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
 
-  quitMainButtonLabel = new uiLabel ("", 3, 21, fontAwesome, 24, 200, colorBlue, colorOrange, colorWhite);
+  quitMainButtonLabel = new uiButtonLabel ("", 3, 21, fontAwesome, 24, 200, colorBlue, colorOrange, colorWhite);
 
-  plotterStartButtonLabel = new uiLabel ("START", 52, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
-  plotterPauseButtonLabel = new uiLabel ("PAUSE", 52, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
-  plotterResumeButtonLabel = new uiLabel ("RESUME", 52, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
-  plotterStopButtonLabel = new uiLabel ("STOP", 52, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
-  plotterCalibrateButtonLabel = new uiLabel ("CALIBRATE", 25, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
+  plotterStartButtonLabel = new uiButtonLabel ("START", 52, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
+  plotterPauseButtonLabel = new uiButtonLabel ("PAUSE", 52, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
+  plotterResumeButtonLabel = new uiButtonLabel ("RESUME", 52, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
+  plotterStopButtonLabel = new uiButtonLabel ("STOP", 52, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
+  plotterCalibrateButtonLabel = new uiButtonLabel ("CALIBRATE", 25, 20, segoeFont, boxTitleFontSize, colorMediumBlack, colorWhite, colorOrange, colorWhite);
 
-  portDecButtonLabel = new uiLabel ("", 8, 30, fontAwesome, 27, colorWhite, colorWhite, colorOrange, colorWhite);
-  portIncButtonLabel = new uiLabel ("", 12, 30, fontAwesome, 27, colorWhite, colorWhite, colorOrange, colorWhite);
+  portDecButtonLabel = new uiButtonLabel ("", 8, 30, fontAwesome, 27, colorWhite, colorWhite, colorOrange, colorWhite);
+  portIncButtonLabel = new uiButtonLabel ("", 12, 30, fontAwesome, 27, colorWhite, colorWhite, colorOrange, colorWhite);
 
 
   //instantiating buttons
@@ -543,8 +603,21 @@ void setup() {
 
 
   //normal standalone text labels
-
+  //name, x, y, font, fontSize, color
   fileName = new textLabel ("None", 125, 152, segoeFont, boxTitleFontSize, colorMediumBlack);
+  portNameLabel = new textLabel ("NONE",infoBoxX+290, infoBoxY+75, segoeFont, boxTitleFontSize, colorMediumBlack);
+  currentTask = new textLabel ("0/0", 320, 355, segoeFont, boxTitleFontSize, colorMediumBlack);
+  currentSerialComStatus = new textLabel ("Connected", 300, 234, segoeFont, boxTitleFontSize, colorMediumBlack);
+  currentPlotterStatus = new textLabel ("Idle", 310, 275, segoeFont, boxTitleFontSize, colorMediumBlack);
+  currentPlotterPosition = new textLabel ("0, 0, 0", 310, 314, segoeFont, boxTitleFontSize, colorMediumBlack);
+
+  //x, y, width, height, color, textLabel
+  fileNameBox = new labelBox (infoBoxX+85, infoBoxY+14, 280, boxTitleHeight, colorTextField, fileName);
+  portNameBox = new labelBox (infoBoxX+254, infoBoxY+57, 110, boxTitleHeight, colorTextField, portNameLabel);
+  serialComStatusBox = new labelBox (infoBoxX+254, infoBoxY+97, 110, boxTitleHeight, colorTextField, currentSerialComStatus);
+  plotterStatusBox = new labelBox (infoBoxX+254, infoBoxY+137, 110, boxTitleHeight, colorTextField, currentPlotterStatus);
+  plotterPositionBox = new labelBox (infoBoxX+254, infoBoxY+177, 110, boxTitleHeight, colorTextField, currentPlotterPosition);
+  currentTaskBox = new labelBox (infoBoxX+254, infoBoxY+217, 110, boxTitleHeight, colorTextField, currentTask);
 }
 
 //=========================================================================//
@@ -688,7 +761,6 @@ void showInitialWindow() {
 }
 
 //=========================================================================//
-
 //displays static titles and stuff
 
 void showInitialStaticInfo () {
@@ -731,8 +803,6 @@ void showInitialStaticInfo () {
 
   portDecButton.display();
   portIncButton.display();
-
-
 }
 
 //=========================================================================//
@@ -891,8 +961,6 @@ void showMainWindow() {
     textFont (segoeFont, boxTitleFontSize);
     fill (colorMediumBlack);
     text ("Filename", infoBoxX+20, infoBoxY+32);
-    fill (colorTextField);
-    rect (infoBoxX+85, infoBoxY+14, 280, boxTitleHeight);
 
     loadImageButton.display();
     linesButton.display();
@@ -956,7 +1024,7 @@ void showMainWindow() {
       }
     }
 
-    fileName.display();
+    fileNameBox.display();
     loadImageButton.isPressed();
 
     //--------------Image Selection Ends ----------------------//
@@ -1035,12 +1103,11 @@ void showMainWindow() {
     text ("Position", infoBoxX+160, infoBoxY+195);
     text ("Current Task", infoBoxX+160, infoBoxY+235);
 
-    fill (colorTextField);
-    rect (infoBoxX+254, infoBoxY+57, 110, boxTitleHeight);
-    rect (infoBoxX+254, infoBoxY+97, 110, boxTitleHeight);
-    rect (infoBoxX+254, infoBoxY+137, 110, boxTitleHeight);
-    rect (infoBoxX+254, infoBoxY+177, 110, boxTitleHeight);
-    rect (infoBoxX+254, infoBoxY+217, 110, boxTitleHeight);
+    portNameBox.display();
+    serialComStatusBox.display();
+    plotterStatusBox.display();
+    plotterPositionBox.display();
+    currentTaskBox.display();
 
     //-------------- Info Fields Ends ------------------//
 
@@ -1054,11 +1121,13 @@ void showMainWindow() {
       plotterUpArrow.labelColor = colorOrange;
     }
     //-------------------------------//
+
     plotterLeftArrow.displayLabel();
     if (plotterLeftButton.isPressed()){
       plotterLeftArrow.labelColor = colorOrange;
     }
     //-------------------------------//
+
     plotterPenCircle.displayLabel();
     plotterPenArrow.displayLabel();
 
@@ -1066,12 +1135,14 @@ void showMainWindow() {
       plotterPenCircle.labelColor = colorOrange;
     }
     //------------------------------//
+
     plotterRightArrow.displayLabel();
 
     if (plotterRightButton.isPressed()){
       plotterRightArrow.labelColor = colorOrange;
     }
     //------------------------------//
+
     plotterDownArrow.displayLabel();
 
     if (plotterDownButton.isPressed()){
@@ -1193,9 +1264,11 @@ void showMainWindow() {
     //----------------Quit Button Ends -----------------//
 
     if ((serialPort.active()) && (activePortName != "NONE")) {
-      textFont(segoeFont, boxTitleFontSize);
-      fill(colorMediumBlack);
-      text(activePortName, infoBoxX+290, infoBoxY+75);
+      portNameBox.setLabel(activePortName);
+    }
+
+    else {
+      portNameBox.setLabel("NONE");
     }
 
     //------------ Serial Comm Starts --------------//
@@ -1206,7 +1279,6 @@ void showMainWindow() {
           countLines();
           thread("plotImage");
         }
-
       }
     }
 
