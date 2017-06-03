@@ -5,10 +5,13 @@
 //  Code for controlling three stepper drives in a CNC
 //  plotter. This uses Arduino Nano 328.
 //
+//  Swapped software serial ports with hardware serial
+//  Software serial is for debugging
+//
 //  Author : Vishnu M Aiea
 //  Web : www.vishnumaiea.in
 //  Date created : 10:48 PM 22-04-2017, Saturday
-//  Last modified : 10:42:26 PM, 17-05-2017, Wednesday
+//  Last modified : 12:19:07 AM, 04-06-2017, Sunday
 //
 //=========================================================================//
 
@@ -26,59 +29,68 @@ int LED_PIN = 13;
 int imageWidth = 0;
 int imageHeight = 0;
 
+//if you're using stepper motors for all the 3 axes, then input the step counts
+//of each motor here
 const int sprX = 48; //steps per revolution
-const int sprY = 20;
-const int sprZ = 20;
+const int sprY = 20; //CD stepper motors
+const int sprZ = 20; //CD stepper motors
 
+//stepCount keep track of step increments of each stepper motor
 int stepCountX = 0; //current step counts
 int stepCountY = 0;
 int stepCountZ = 0;
 
-const float precisionX = 0.06625;
+//precision depends on your mechanical setup. it can be found by dividing
+//the linear displacement produced by an axis with the total no. of steps
+//taken by the motor to achieve it
+const float precisionX = 0.06625; //in mm
 const float precisionY = 0.152;
 const float precisionZ = 0.152;
 
-const float pixelSize = 0.152; //size of one pixel square
+//this defines the pixel size for your plotting area. your plotting area
+//will be divided into a 2D array of pixels just like an image. you need to
+//determine the precision you want for the pixel
+const float pixelSize = 0.152; //size of one pixel square in mm
 
+//defines the single step equivalent for each motors.
 int singleStepX = 1; //single step equivalent
 int singleStepY = 1;
 int singleStepZ = 1;
 
+//plotting area bundary interms of pixels. equivalent to image width and height
 int pixelBoundX = 327; //maximum allowed steps
 int pixelBoundY = 250;
 int pixelBoundZ = 100;
-
-int xRotate = 500; //unit step count
-int yRotate = 250;
-int zRotate = 100;
 
 int minDelay = 200;
 int medDelay = 400;
 int longDelay = 700;
 int drawDelay = 200;
 
-bool isPenDown = false;
-
+//defines the initial speed for each stepper motors
 int motorSpeedX = 1000; //stepper motor speeds
 int motorSpeedY = 1400;
 int motorSpeedZ = 1500;
 
+//defines the max displacements for each axis in terms of motor steps
 int stepBoundX = 750; //total steps on each axis
 int stepBoundY = 250;
 int stepBoundZ = 250;
-
-char incBytes[2]; //serial data buffer
-char incByte; //serial char data buffer
 
 int enableX = A5; //enable pins
 int enableY = 12;
 int enableZ = A4;
 
 int segmentCount = 0;
+bool isPenDown = false;
 
 String tempString;
+
+//software serial is used for debugging
 SoftwareSerial mySerial(2, 3); // RX, TX
 
+//define each steppers
+//you can reduce pins to half by using two transistors
 Stepper stepperX (sprX, 4, 5, 6, 7);
 Stepper stepperY (sprY, 8, 9, 10, 11);
 Stepper stepperZ (sprZ, A0, A1, A2, A3);
@@ -90,30 +102,32 @@ void setup() {
   stepperY.setSpeed (motorSpeedY);
   stepperZ.setSpeed (motorSpeedZ);
 
-  pinMode (enableX, OUTPUT);
+  pinMode (enableX, OUTPUT); //pin modes for motor enabel pins
   pinMode (enableY, OUTPUT);
   pinMode (enableZ, OUTPUT);
 
-  digitalWrite (enableX, LOW);
+  digitalWrite (enableX, LOW); //disable the motors
   digitalWrite (enableY, LOW);
   digitalWrite (enableZ, LOW);
 
-  pinMode(LED_PIN, OUTPUT);
+  pinMode(LED_PIN, OUTPUT); //for debugging
+
   Serial.begin(9600);
   while (!Serial) {
     ;
   }
-  Serial.println("I'm ready!");
+
   mySerial.begin(9600);
-  mySerial.setTimeout(20);
+  mySerial.setTimeout(20); //set timeout for each serial port
   Serial.setTimeout(20);
+  mySerial.println("I'm ready!");
 }
 
 //=========================================================================//
 
 void loop() {
   if (mySerial.available() > 0) {
-    tempString = mySerial.readStringUntil(DELIMITER);
+    tempString = Serial.readStringUntil(DELIMITER);
 
     if(tempString != NULL) {
       executeCommand();
@@ -139,6 +153,9 @@ bool line (int X1, int Y1, int X2, int Y2) {
 }
 
 //=========================================================================//
+//absMoveTo take the head (pen) to the exact location in the plotting area
+//we have two types of abs movement here : in terms of pixels and in terms
+//of steps
 
 bool absMoveTo(int targetCoordX, int targetCoordY, String coordType) {
 
@@ -147,23 +164,26 @@ bool absMoveTo(int targetCoordX, int targetCoordY, String coordType) {
   int targetStepsY = 0;
 
   if(coordType.equals(PIXELS)) {
-    targetStepsX = convertToStepsX(targetCoordX);
+    targetStepsX = convertToStepsX(targetCoordX); //pixels need to be converted to steps
     targetStepsY = convertToStepsY(targetCoordY);
   }
   else if(coordType.equals(STEPS)) {
-    targetStepsX = targetCoordX;
+    targetStepsX = targetCoordX; //steps only need assignments
     targetStepsY = targetCoordY;
   }
 
   if ((targetStepsX <= stepBoundX) && (targetStepsY <= stepBoundY)) { //tarhet coordinates must be within bounds
     if ((targetStepsX != stepCountX) || (targetStepsY != stepCountY)) {
       int relTargetStepsX, relTargetStepsY;
+
+      //relative target is calculated from where the plotter head is right now
       relTargetStepsX = targetStepsX - stepCountX; //calculate the relative target
       relTargetStepsY = targetStepsY - stepCountY; //by subtracting from current XY
 
       digitalWrite(enableX, HIGH); //enable the motors
       digitalWrite(enableY, HIGH);
 
+      //uses pseudo simultaneous stepper driving
       while (!isCompleted) { //loop each step until completion
         if ((relTargetStepsX > 0) && (stepCountX != targetStepsX)) { //positive X movement (further from origin)
           stepperX.step(singleStepX); //perform a single step movement
@@ -191,33 +211,32 @@ bool absMoveTo(int targetCoordX, int targetCoordY, String coordType) {
   }
 
   else {
-    Serial.println("absMoveTo Error : Out of bound.");
-    Serial.print("stepCountX = ");
-    Serial.println(stepCountX);
-    Serial.print("stepCountY = ");
-    Serial.println(stepCountY);
-    Serial.println(coordType);
-    Serial.print("targetCoordX = ");
-    Serial.println(targetCoordX);
-    Serial.print("targetCoordYX = ");
-    Serial.println(targetCoordY);
-    Serial.println("targetCoordY = ");
-    Serial.println(targetCoordY);
-    Serial.print("targetStepsY = ");
-    Serial.println(targetStepsY);
+    mySerial.println("absMoveTo Error : Out of bound.");
+    mySerial.print("stepCountX = ");
+    mySerial.println(stepCountX);
+    mySerial.print("stepCountY = ");
+    mySerial.println(stepCountY);
+    mySerial.println(coordType);
+    mySerial.print("targetCoordX = ");
+    mySerial.println(targetCoordX);
+    mySerial.print("targetCoordYX = ");
+    mySerial.println(targetCoordY);
+    mySerial.println("targetCoordY = ");
+    mySerial.println(targetCoordY);
+    mySerial.print("targetStepsY = ");
+    mySerial.println(targetStepsY);
     movePen(UP);
-    absMoveTo(0, 0, PIXELS);
+    absMoveTo(0, 0, PIXELS); //return home
     return false;
   }
 
   if (isCompleted) {
-    Serial.print('\n');
-    Serial.println("- absMoveTo -");
-    Serial.print("stepCountX : ");
-    Serial.println(stepCountX);
-    Serial.print("stepCountY : ");
-    Serial.println(stepCountY);
-    //delay(toDelay);
+    mySerial.print('\n');
+    mySerial.println("- absMoveTo -");
+    mySerial.print("stepCountX : ");
+    mySerial.println(stepCountX);
+    mySerial.print("stepCountY : ");
+    mySerial.println(stepCountY);
     return true;
   }
   else {
@@ -231,14 +250,14 @@ bool absMoveTo(int targetCoordX, int targetCoordY, String coordType) {
 
 bool relMoveTo(int targetPixelX, int targetPixelY) {
 
-  if((targetPixelX == 0) || (targetPixelY == 0)) {
+  if((targetPixelX == 0) || (targetPixelY == 0)) { //no need of movement if coord are zero
     return true;
   }
 
-  int targetStepsX = convertToStepsX(targetPixelX);
+  int targetStepsX = convertToStepsX(targetPixelX); //convert pixels to steps
   int targetStepsY = convertToStepsY(targetPixelY);
 
-  if(absMoveTo((targetStepsX + stepCountX), (targetStepsY + stepCountY), STEPS)) { //add the coordinates
+  if(absMoveTo((targetStepsX + stepCountX), (targetStepsY + stepCountY), STEPS)) { //add the coordinates and do absMove
     return true;
   }
   else return false;
@@ -293,7 +312,7 @@ bool movePen(int x) {
     }
   }
   else {
-    Serial.println("movePen Error : Invalid input.");
+    mySerial.println("movePen Error : Invalid input.");
     return false;
   }
 }
@@ -334,26 +353,19 @@ bool calibXY (bool startCalib) {
     return false;
   }
   else {
-    Serial.println("calibXY Error : Invalid input.");
+    mySerial.println("calibXY Error : Invalid input.");
   }
 }
 
 //=========================================================================//
-
-void blinkOnce () {
-  digitalWrite(LED_PIN, HIGH);
-  delay(100);
-  digitalWrite(LED_PIN, LOW);
-}
-
-//=========================================================================//
+//removes a specified char from a string
 
 void removeChar (String a, char b) {
   int i = a.indexOf(b);
 
   if(i >= 0) {
-    Serial.println();
-    Serial.println("Removing delimiter from" + tempString);
+    mySerial.println();
+    mySerial.println("Removing delimiter from" + tempString);
     tempString.remove(i);
   }
 }
@@ -364,25 +376,29 @@ void executeCommand () {
 
   //------------------- Initialization starts ----------------------//
   if(tempString.startsWith("READY?")) {
-    Serial.println("SW Received : " + tempString);
+    mySerial.println("SW Received : " + tempString);
     sendResponse("READY!");
-    Serial.println("SW Sent : READY!");
-    Serial.println();
+    mySerial.println("SW Sent : READY!");
+    mySerial.println();
     tempString = "";
   }
   //------------------- Initialization ends ----------------------//
 
+  //------------------- M30 starts ----------------------//
+  //M30 = stop plotting and return to home
+
   else if(tempString.startsWith("M30")) {
-    Serial.println("M30 Received");
+    mySerial.println("M30 Received");
     movePen(UP);
     absMoveTo(0, 0, PIXELS);
   }
+  //------------------- M30 ends ----------------------//
 
   //-------------------------- G251 starts -----------------------//
-  //G251 specifies the width and height of the image or drawinf area
+  //G251 specifies the width and height of the image or drawing area
 
   else if(tempString.startsWith("G251")) {
-    Serial.println("G251 Received");
+    mySerial.println("G251 Received");
     if(checkCommand(tempString)) { //check the command
       String commandString = tempString; //create copy
 
@@ -409,7 +425,7 @@ void executeCommand () {
   //to draw
 
   else if (tempString.startsWith("G252")) {
-    Serial.println("G52 Received");
+    mySerial.println("G52 Received");
     String commandString = tempString; //make a copy of the command
 
     if(checkCommand(tempString)) {
@@ -428,9 +444,9 @@ void executeCommand () {
   //--------------------- G28 starts -----------------------//
   //G28 specifies homing
   else if (tempString.startsWith("G28")) {
-    Serial.println("G28 Received");
+    mySerial.println("G28 Received");
     if((stepCountX == 0) && (stepCountY == 0)) {
-      Serial.println("Already home");
+      mySerial.println("Already home");
     }
     else {
       absMoveTo(0, 0, PIXELS);
@@ -443,22 +459,22 @@ void executeCommand () {
   //G00 defines absolute movement
 
   else if (tempString.startsWith("G00")) {
-    Serial.println("G00 Received");
+    mySerial.println("G00 Received");
     String commandString = tempString; //make a copy of the command
 
     if(checkCommand(tempString)) {
       commandString.replace("G00,", ""); //remove the header part
 
-      //Serial.println("Modified String : " + commandString);
+      //mySerial.println("Modified String : " + commandString);
       String xSubString = commandString.substring(0, commandString.indexOf(',')); //extract the X part of the string
-      //Serial.println(xSubString);
+      //mySerial.println(xSubString);
       xSubString.replace("X", ""); //remove X to make integer string
       int xValue = xSubString.toInt(); //convert the integer string to int
 
       xSubString = commandString.substring(0, commandString.indexOf(',') + 1); //extract the X part of the string
       commandString.replace(xSubString, ""); //remove the X part
       String ySubString = commandString.substring(0, commandString.indexOf(',')); //extract the Y part of the string
-      //Serial.println(ySubString);
+      //mySerial.println(ySubString);
       ySubString.replace("Y", ""); //remove Y to make integer string
       int yValue = ySubString.toInt(); //convert the integer string to int
 
@@ -467,72 +483,72 @@ void executeCommand () {
       ySubString = commandString.substring(0, commandString.indexOf(',') + 1); //extract the Y part of the string
       commandString.replace(ySubString, ""); //remove the Y part
       String zSubString = commandString;
-      //Serial.println(zSubString);
+      //mySerial.println(zSubString);
       zSubString.replace("Z", ""); //remove Z to make integer string
       int zValue = zSubString.toInt(); //convert the integer string to int
 
-      Serial.print("X = ");
-      Serial.print(xValue);
-      Serial.print(", ");
-      Serial.print("Y = ");
-      Serial.print(yValue);
-      Serial.print(", ");
-      Serial.print("Z = ");
-      Serial.println(zValue);
-      Serial.println();
+      mySerial.print("X = ");
+      mySerial.print(xValue);
+      mySerial.print(", ");
+      mySerial.print("Y = ");
+      mySerial.print(yValue);
+      mySerial.print(", ");
+      mySerial.print("Z = ");
+      mySerial.println(zValue);
+      mySerial.println();
 
       if(zValue == 1) { //if the command is to move pen down
         if(!isPenDown) { //if pen is not already down
           if(movePen(DOWN)) { //try to move the pen
-            Serial.println("Pen is down");
-            Serial.println();
+            mySerial.println("Pen is down");
+            mySerial.println();
             delay(100); //relaxation time
           }
           else { //if couldn't move the pen
-            Serial.println("Couldn't move the pen down!");
+            mySerial.println("Couldn't move the pen down!");
           }
         }
         else { //if pen is already down
-          Serial.println("Pen is already down");
+          mySerial.println("Pen is already down");
         }
       }
 
       else if(zValue == 0) { //if the command is to move pen up
         if(isPenDown) { //only if pen is down
           if(movePen(UP)) { //try to move the pen
-            Serial.println("Pen is up");
-            Serial.println();
+            mySerial.println("Pen is up");
+            mySerial.println();
             delay(100); //relaxation time
           }
           else { //if couldn't move the pen
-            Serial.println("Couldn't move the pen up!");
+            mySerial.println("Couldn't move the pen up!");
           }
         }
         else { //if pen is already up
-          Serial.println("Pen is already up");
+          mySerial.println("Pen is already up");
         }
       }
 
       if((stepCountX == convertToStepsX(xValue)) && (stepCountY == convertToStepsY(yValue))) {
-        Serial.println("Pen is already at location");
-        Serial.println(tempString);
-        Serial.println("SW Sent DONE!");
+        mySerial.println("Pen is already at location");
+        mySerial.println(tempString);
+        mySerial.println("SW Sent DONE!");
         sendResponse("DONE!");
-        Serial.println();
+        mySerial.println();
         tempString = ""; //clear command buffer
       }
       else if(absMoveTo(xValue, yValue, PIXELS)) { //try to perform an abolute move
-        Serial.println("SW Sent DONE!");
+        mySerial.println("SW Sent DONE!");
         sendResponse("DONE!"); //send confirmation
-        Serial.println();
+        mySerial.println();
         tempString = ""; //clear tempString
       }
       else {
-        Serial.println("Couldn't complete abs move ");
-        Serial.println(tempString);
-        Serial.println("SW Sent DONE!");
+        mySerial.println("Couldn't complete abs move ");
+        mySerial.println(tempString);
+        mySerial.println("SW Sent DONE!");
         sendResponse("DONE!");
-        Serial.println();
+        mySerial.println();
         tempString = ""; //clear command buffer
       }
     }
@@ -544,22 +560,22 @@ void executeCommand () {
   //G01 defines relative movement
 
   else if (tempString.startsWith("G01")) {
-    Serial.println("G01 Received");
+    mySerial.println("G01 Received");
     String commandString = tempString; //make a copy of the command
 
     if(checkCommand(tempString)) {
       commandString.replace("G01,", ""); //remove the header part
 
-      //Serial.println("Modified String : " + commandString);
+      //mySerial.println("Modified String : " + commandString);
       String xSubString = commandString.substring(0, commandString.indexOf(',')); //extract the X part of the string
-      //Serial.println(xSubString);
+      //mySerial.println(xSubString);
       xSubString.replace("X", ""); //remove X to make integer string
       int xValue = xSubString.toInt(); //convert the integer string to int
 
       xSubString = commandString.substring(0, commandString.indexOf(',') + 1); //extract the X part of the string
       commandString.replace(xSubString, ""); //remove the X part
       String ySubString = commandString.substring(0, commandString.indexOf(',')); //extract the Y part of the string
-      //Serial.println(ySubString);
+      //mySerial.println(ySubString);
       ySubString.replace("Y", ""); //remove Y to make integer string
       int yValue = ySubString.toInt(); //convert the integer string to int
 
@@ -568,33 +584,33 @@ void executeCommand () {
       ySubString = commandString.substring(0, commandString.indexOf(',') + 1); //extract the Y part of the string
       commandString.replace(ySubString, ""); //remove the Y part
       String zSubString = commandString;
-      //Serial.println(zSubString);
+      //mySerial.println(zSubString);
       zSubString.replace("Z", ""); //remove Z to make integer string
       int zValue = zSubString.toInt(); //convert the integer string to int
 
-      Serial.print("X = ");
-      Serial.print(xValue);
-      Serial.print(", ");
-      Serial.print("Y = ");
-      Serial.print(yValue);
-      Serial.print(", ");
-      Serial.print("Z = ");
-      Serial.println(zValue);
-      Serial.println();
+      mySerial.print("X = ");
+      mySerial.print(xValue);
+      mySerial.print(", ");
+      mySerial.print("Y = ");
+      mySerial.print(yValue);
+      mySerial.print(", ");
+      mySerial.print("Z = ");
+      mySerial.println(zValue);
+      mySerial.println();
 
       if(zValue == 1) { //if the command is to move pen down
         if(!isPenDown) { //if pen is not already down
           delay(100);
           if(movePen(DOWN)) { //try to move the pen
-            Serial.println("Pen is down");
+            mySerial.println("Pen is down");
             delay(100); //relaxation time
           }
           else { //if couldn't move the pen
-            Serial.println("Couldn't move the pen down!");
+            mySerial.println("Couldn't move the pen down!");
           }
         }
         else { //if pen is already down
-          Serial.println("Pen is already down");
+          mySerial.println("Pen is already down");
         }
       }
 
@@ -602,65 +618,67 @@ void executeCommand () {
         if(isPenDown) { //only if pen is down
           delay(100);
           if(movePen(UP)) { //try to move the pen
-            Serial.println("Pen is up");
+            mySerial.println("Pen is up");
             delay(100); //relaxation time
           }
           else { //if couldn't move the pen
-            Serial.println("Couldn't move the pen up!");
+            mySerial.println("Couldn't move the pen up!");
           }
         }
         else { //if pen is already up
-          Serial.println("Pen is already up");
+          mySerial.println("Pen is already up");
         }
       }
 
       if((stepCountX == convertToStepsX(xValue)) && (stepCountY == convertToStepsY(yValue))) {
-        Serial.println("Pen is already at location");
+        mySerial.println("Pen is already at location");
       }
       else if(relMoveTo(xValue, yValue)) {
-        Serial.println("SW Sent DONE!");
+        mySerial.println("SW Sent DONE!");
         sendResponse("DONE!");
-        Serial.println();
+        mySerial.println();
         tempString = "";
       }
       else {
-        Serial.println("Couldn't complete rel move " + tempString);
-        Serial.println("SW Sent DONE!");
+        mySerial.println("Couldn't complete rel move " + tempString);
+        mySerial.println("SW Sent DONE!");
         sendResponse("DONE!");
-        Serial.println();
+        mySerial.println();
         tempString = "";
       }
     }
     //----------------------- G01 ends ----------------------//
 
     else {
-      Serial.print("Invalid format -> ");
-      Serial.println(tempString);
+      mySerial.print("Invalid format -> ");
+      mySerial.println(tempString);
       sendResponse("INVALID!");
-      Serial.println("SW Sent INVALID!");
-      Serial.println();
+      mySerial.println("SW Sent INVALID!");
+      mySerial.println();
       tempString = "";
     }
   }
 
   else {
-    Serial.println("SW Received : " + tempString);
+    mySerial.println("SW Received : " + tempString);
     sendResponse("DONE!");
-    Serial.println("SW Sent DONE!");
-    Serial.println();
+    mySerial.println("SW Sent DONE!");
+    mySerial.println();
     tempString = "";
   }
 }
 
 //=========================================================================//
+//send responses back to control software
 
 bool sendResponse (String a) {
-  mySerial.print(a);
-  mySerial.print(DELIMITER);
+  Serial.print(a);
+  Serial.print(DELIMITER);
   return true;
 }
 
 //=========================================================================//
+//checks each commands received for validity
 
 bool checkCommand (String a) {
   //--------------------------------//
@@ -707,21 +725,6 @@ bool checkCommand (String a) {
   //--------------------------------//
 
   else return false;
-}
-
-//=========================================================================//
-
-bool ifConfirm() {
-  String tempString;
-
-  while(1) {
-    if(Serial.available() > 0) {
-      tempString = Serial.readString();
-      if(tempString.equals("NEXT")) {
-        return true;
-      }
-    }
-  }
 }
 
 //=========================================================================//
