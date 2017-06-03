@@ -11,7 +11,7 @@
 //  Author : Vishnu M Aiea
 //  Web : www.vishnumaiea.in
 //  Date created : 10:48 PM 22-04-2017, Saturday
-//  Last modified : 12:19:07 AM, 04-06-2017, Sunday
+//  Last modified : 01:01:26 AM, 04-06-2017, Sunday
 //
 //=========================================================================//
 
@@ -77,6 +77,10 @@ int stepBoundX = 750; //total steps on each axis
 int stepBoundY = 250;
 int stepBoundZ = 250;
 
+int xRotate = 500; //unit step count
+int yRotate = 250;
+int zRotate = 100;
+
 int enableX = A5; //enable pins
 int enableY = 12;
 int enableZ = A4;
@@ -126,7 +130,7 @@ void setup() {
 //=========================================================================//
 
 void loop() {
-  if (mySerial.available() > 0) {
+  if (Serial.available() > 0) {
     tempString = Serial.readStringUntil(DELIMITER);
 
     if(tempString != NULL) {
