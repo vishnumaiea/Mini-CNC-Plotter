@@ -3,13 +3,13 @@
 
 //   -- Mini CNC Plotter --
 //
-//   Added new class : labelBox and centered the label values
+//   Added realtime stats to the info window.
 //
 //   Author : Vishnu M Aiea
 //   E-Mail : vishnumaiea@gmail.com
 //   Web : www.vishnumaiea.in
 //   Date created : 12:20 PM 27-04-2017, Thursday
-//   Last modified : 05:49:14 PM, 01-06-2017, Thursday
+//   Last modified : 09:12:26 PM, 03-06-2017, Saturday
 
 //=========================================================================//
 
@@ -19,12 +19,17 @@ Serial serialPort;
 //=========================================================================//
 //class definitons
 
+//uiButton defines interactive buttons with hover, press and click effects.
+//a button can be associated with a label defined by uiButtonLabel
+
 public class uiButton {
   int buttonWidth, buttonHeight, buttonX, buttonY;
   color buttonColor, defaultColor, backupColor, hoverColor, activeColor, pressedColor;
   boolean ifPressed, ifClicked, ifHover, ifActive, mouseStatus;
   uiButtonLabel linkedLabel;
 
+  //---------------------------------//
+  //constructor
   uiButton (int a, int b, int c, int d, color e, color f, color g, color h) {
     buttonX = a;
     buttonY = b;
@@ -43,13 +48,17 @@ public class uiButton {
     mouseStatus = false;
   }
 
-  void display () {
+  //---------------------------------//
+
+  void display () { //display the button and label
     fill(buttonColor);
     rect(buttonX, buttonY, buttonWidth, buttonHeight);
-    linkedLabel.display();
+    linkedLabel.display(); //display the label
   }
 
-  boolean isHover () {
+  //---------------------------------//
+
+  boolean isHover () { //hover effects
     if ((mouseX >= buttonX) && (mouseX <= (buttonX + buttonWidth))
       && (mouseY >= buttonY) && (mouseY <= (buttonY + buttonHeight))) {
       buttonColor = hoverColor;
@@ -65,7 +74,9 @@ public class uiButton {
     }
   }
 
-  boolean isPressed () {
+  //---------------------------------//
+
+  boolean isPressed () { //when button is pressed
     if (isHover()) {
       if (mousePressed && (mouseButton == LEFT)) {
         ifPressed = true;
@@ -78,6 +89,8 @@ public class uiButton {
     }
     return false;
   }
+
+  //---------------------------------//
 
   boolean isClicked () {
     if (isHover()) {
@@ -97,28 +110,41 @@ public class uiButton {
     return false;
   }
 
-  void reset() {
+  //---------------------------------//
+
+  void reset() { //resets color to the default color
    defaultColor = backupColor;
   }
+
+  //---------------------------------//
 
   void setColor (color a) {
     defaultColor = a;
   }
 
-  void setLabelColor (color a) {
+  //---------------------------------//
+
+  void setLabelColor (color a) { //set the color of the linked label
     linkedLabel.setColor(a);
   }
 
-  void linkLabel (uiButtonLabel a) {
+  //---------------------------------//
+
+  void linkLabel (uiButtonLabel a) { //the label to link
     linkedLabel = a;
   }
 
-  void setLabel (String a) {
+  //---------------------------------//
+
+  void setLabel (String a) { //sets label name or text
     linkedLabel.labelName = a;
   }
 } //uiButton class ends
 
 //=========================================================================//
+
+//uiButtonLabel defines text labels with hover, press and click effects
+//they must be linked with a uiButton to work
 
 public class uiButtonLabel {
 
@@ -127,6 +153,8 @@ public class uiButtonLabel {
   PFont labelFont;
   color labelColor, defaultColor, backupColor, hoverColor, pressedColor, activeColor;
   uiButton linkedButton;
+
+  //---------------------------------//
 
   uiButtonLabel(String a, int b, int c, PFont d, int e, color f, color g, color h, color i) {
     labelName = a;
@@ -142,6 +170,8 @@ public class uiButtonLabel {
     activeColor = i;
   }
 
+  //---------------------------------//
+
   void display() {
 
     if (linkedButton.isHover()) {
@@ -155,20 +185,28 @@ public class uiButtonLabel {
     }
   }
 
+  //---------------------------------//
+  //displays w/t the button
   void displayLabel () {
     textFont(labelFont, fontSize);
     fill(labelColor);
     text(labelName, labelX, labelY);
   }
 
+  //---------------------------------//
+
   void setColor (color a) {
     defaultColor = a;
   }
+
+  //---------------------------------//
 
   void reset() {
     //labelColor = backupColor;
     defaultColor = backupColor;
   }
+
+  //---------------------------------//
 
   void linkButton (uiButton a) {
     linkedButton = a;
@@ -179,6 +217,9 @@ public class uiButtonLabel {
 
 //=========================================================================//
 
+//textLabel are standalone texts that can be placed anywhere
+//they can be associated with a text labelbox defined by labelbox
+
 public class textLabel {
   String labelName;
   int labelX;
@@ -187,6 +228,8 @@ public class textLabel {
   int fontSize;
   color primaryColor;
   color defaultColor;
+
+  //---------------------------------//
 
   textLabel (String a, int b, int c, PFont d, int e, color f) {
     labelName = a;
@@ -198,19 +241,27 @@ public class textLabel {
     defaultColor = primaryColor;
   }
 
+  //---------------------------------//
+
   public void display () {
     fill(primaryColor);
     textFont(labelFont, fontSize);
     text(labelName, labelX, labelY);
   }
 
+  //---------------------------------//
+
   public void setColor (color a) {
     primaryColor = a;
   }
 
+  //---------------------------------//
+
   public void setLabel (String a) {
     labelName = a;
   }
+
+  //---------------------------------//
 
   public void reset () {
     primaryColor = defaultColor;
@@ -219,11 +270,16 @@ public class textLabel {
 
 //=========================================================================//
 
+//labelBox defines static text fields or boxes for text labels
+//can be linked to a textLabel
+
 public class labelBox {
   int width, height, x, y;
   color primaryColor, backupColor;
   boolean labelAvailable;
   textLabel linkedLabel;
+
+  //---------------------------------//
 
   labelBox (int a, int b, int c, int d, color e, textLabel f) { //with associated label text
     x = a;
@@ -236,6 +292,8 @@ public class labelBox {
     labelAvailable = true;
   }
 
+  //---------------------------------//
+
   labelBox (int a, int b, int c, int d, color e) { //without label text
     x = a;
     y = b;
@@ -246,6 +304,8 @@ public class labelBox {
     labelAvailable = false;
   }
 
+  //---------------------------------//
+
   public void display() {
     fill(primaryColor);
     rect(x, y, width, height);
@@ -253,18 +313,26 @@ public class labelBox {
     if(labelAvailable) { //only if label is available
       fill(linkedLabel.primaryColor);
       textFont(linkedLabel.labelFont, linkedLabel.fontSize);
+      //the following will place the text at the center of the button regardless of the text's length
+      //the logic is to set half of the (box length - text length) as margins are both sides of the text
       text(linkedLabel.labelName, (((width - textWidth(linkedLabel.labelName))/2) + x), (((height - linkedLabel.fontSize)/2) + (y+11)));
     }
   }
+
+  //---------------------------------//
 
   public void setBoxColor (color a) {
     primaryColor = a;
   }
 
+  //---------------------------------//
+
   public void setPosition (int a, int b) {
     x = a;
     y = b;
   }
+
+  //---------------------------------//
 
   public void setLabel (String a) {
     if(labelAvailable) {
@@ -272,11 +340,14 @@ public class labelBox {
     }
   }
 
+  //---------------------------------//
+
   public void reset() {
     primaryColor = backupColor;
   }
 } //labelBox class ends
 
+//class definitons end
 //=========================================================================//
 
 int COORD_TYPE_NONE = 0; //coordinate type identifiers for serial communication
@@ -284,8 +355,9 @@ int COORD_TYPE_START = 1;
 int COORD_TYPE_END = 2;
 int COORD_TYPE_DOWN = 3;
 
-String versionNumber = "1.0.2";
+String versionNumber = "1.0.8";
 
+//list of human readable error status
 String [] serialStatusList = {"Error : Could not find the port specified !",
                              "Error : Device disconnected !",
                              "Serial ended !",
@@ -985,6 +1057,8 @@ void showMainWindow() {
         fileName.reset();
         fileName.labelName = getFileName(imageFilePath);
         println("Image loaded");
+        countLines();
+        currentTask.setLabel("0/" + lineCount);
       }
     }
 
@@ -1145,7 +1219,6 @@ void showMainWindow() {
     }
 
     if ((plotterStopButton.isClicked()) && (ifStartPlotter)) {
-      lineCount = 0;
       ifPlotterReady = false;
       isPlottingFinished = true;
       isPlottingStarted = false;
@@ -1239,7 +1312,7 @@ void showMainWindow() {
 
     if ((isImageLoaded) && (ifLines)) {
       if ((ifStartPlotter) && (!ifPausePlotter)) {
-        if (lineCount == 0){
+        if ((lineCount != 0) && (currentSegment <= 0) && (!isPlotterActive)){
           countLines();
           thread("plotImage");
         }
@@ -1267,6 +1340,9 @@ boolean resetAll() {
   selectPortValue = -1;
   serialStatus = -1;
   currentSerialComStatus.setLabel("Disconnected");
+  currentTask.setLabel("0/0");
+  currentPlotterStatus.setLabel("Idle");
+  currentPlotterPosition.setLabel("0, 0, 0");
 
   isImageLoaded = false;
   isImageSelected = false;
@@ -1311,7 +1387,6 @@ boolean resetAll() {
 //=========================================================================//
 
 boolean resetPlotter () {
-  lineCount = 0;
   ifPlotterReady = false;
   isPlottingFinished = true;
   isPlottingStarted = false;
@@ -1328,6 +1403,7 @@ boolean resetPlotter () {
   ifStopPlotter = true;
 
   currentPlotterStatus.setLabel("Idle");
+  currentPlotterPosition.setLabel("0, 0, 0");
 
   plotterStopButton.reset();
   plotterStopButtonLabel.reset();
@@ -1493,8 +1569,9 @@ boolean isPixelBlack(int x, int y) {
 //counts the no. of lines in image and store the start and end coordinates
 //of each line to a 3D array with total count of lines ie lineCount.
 
-void countLines() {
+boolean countLines() {
   if (isImageLoaded) {
+    lineCount = 0;
     for (int y=0; y<imageHeight; y++) { //loop until image height or rows
       for (int x=0; x<imageWidth; x++) { //loop until image width or columns
         pixelColor = isPixelBlack(x, y); //get the color of the pixel
@@ -1555,10 +1632,12 @@ void countLines() {
     print("Total Lines Found : ");
     println(lineCount);
     println();
+    return true;
   }
 
   else {
     lineCount = -1; //default or error response
+    return false;
   }
 }
 
@@ -1658,13 +1737,16 @@ void plotImage () {
                 if (((coordinateType == COORD_TYPE_END) || (coordinateType == COORD_TYPE_NONE)) && (!isPenDown) && (!ifStopPlotter)) { //check what type of coordiante was sent last. 2 = end, 1 = start
                   println();
                   println("Current Segment = " + currentSegment + " / " + lineCount);
+                  currentTask.setLabel(currentSegment + "/" + lineCount);
                   serialSendCommand("G00," + getStartOfLine(currentSegment) + ",Z2"); //get the start cord of the current line
+                  currentPlotterPosition.setLabel(lineCords[0][0][currentSegment-1] + ", " + lineCords[0][1][currentSegment-1] + ", 2");
                   coordinateType = COORD_TYPE_START; //set the type to start coordiante
                   waitingForResponse = true; //set the flag and wait for response
                 }
 
                 else if((coordinateType == COORD_TYPE_START) && (!isPenDown) && (!ifStopPlotter)) { //if start coordinates have been sent
                   serialSendCommand("G01,X0,Y0,Z1"); //pen down
+                  currentPlotterPosition.setLabel(lineCords[0][0][currentSegment-1] + ", " + lineCords[0][1][currentSegment-1] + ", 1");
                   isPenDown = true;
                   coordinateType = COORD_TYPE_DOWN; //coordinate for Z axis
                   waitingForResponse = true; //set the flag and wait for response
@@ -1672,6 +1754,7 @@ void plotImage () {
 
                 else if ((coordinateType == COORD_TYPE_DOWN) && (isPenDown) && (!ifStopPlotter)) { //check what type of coordiante was sent last. 2 = end, 1 = start
                   serialSendCommand("G00," + getEndOfLine(currentSegment) + ",Z2");
+                  currentPlotterPosition.setLabel(lineCords[1][0][currentSegment-1] + ", " + lineCords[1][1][currentSegment-1] + ", 2");
                   currentSegment++; //increment and move to next line
                   coordinateType = COORD_TYPE_END; //set the type to end coordinate
                   waitingForResponse = true; //set the flag and wait for response
@@ -1679,6 +1762,7 @@ void plotImage () {
 
                 else if ((coordinateType == COORD_TYPE_END) && (isPenDown) && (!ifStopPlotter)) {
                   serialSendCommand("G01,X0,Y0,Z0"); //pen up
+                  currentPlotterPosition.setLabel(lineCords[1][0][currentSegment-1] + ", " + lineCords[1][1][currentSegment-1] + ", 0");
                   isPenDown = false;
                   coordinateType = COORD_TYPE_NONE; //reset the coordinate type. 0 means nothing
                   waitingForResponse = true; //set the flag and wait for response
@@ -1749,6 +1833,8 @@ void plotImage () {
     coordinateType = COORD_TYPE_NONE;
     currentSerialComStatus.setLabel("Connected");
     currentPlotterStatus.setLabel("Idle");
+    currentPlotterPosition.setLabel("0, 0, 0");
+    currentTask.setLabel(currentSegment + "/" + lineCount);
   }
 
   if(!isCurrentPortActive()) { //if there's a port error - reset everything
@@ -1761,11 +1847,14 @@ void plotImage () {
     ifStopPlotter = true;
     commandRetryCount = 0;
     currentSegment = 0;
+    lineCount = 0;
     waitingForResponse = false;
     coordinateType = 0;
     currentSerialComStatus.setLabel("Connected");
-    println("Thread has terminated abruptly !");
     currentPlotterStatus.setLabel("Idle");
+    currentPlotterPosition.setLabel("0, 0, 0");
+    currentTask.setLabel("0/0");
+    println("Thread has terminated abruptly !");
   }
 }
 
