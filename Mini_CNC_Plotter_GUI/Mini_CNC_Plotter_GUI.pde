@@ -208,7 +208,7 @@ public class textLabel {
     primaryColor = a;
   }
 
-  public void setName (String a) {
+  public void setLabel (String a) {
     labelName = a;
   }
 
@@ -279,37 +279,22 @@ public class labelBox {
 
 //=========================================================================//
 
-public class serialBuffer {
-  String name;
-  int length;
-  int index;
-  byte [] buffer;
-
-  serialBuffer (String a, int b) {
-    name = a;
-    buffer = new byte [b];
-  }
-}
-
-//=========================================================================//
-
-int COORD_TYPE_NONE = 0;
+int COORD_TYPE_NONE = 0; //coordinate type identifiers for serial communication
 int COORD_TYPE_START = 1;
 int COORD_TYPE_END = 2;
 int COORD_TYPE_DOWN = 3;
+
+String versionNumber = "1.0.2";
 
 String [] serialStatusList = {"Error : Could not find the port specified !",
                              "Error : Device disconnected !",
                              "Serial ended !",
                              "No ports available !"};
 
-byte [] serialResponseBuffer = new byte [64];
-byte [] serialCommandBuffer = new byte [64];
-
 int SERIAL_WAIT_DELAY = 200;
 char DELIMITER = ';'; //delimiter
 
-int serialStatus = -1;
+int serialStatus = -1; //used as index to select from serialStatusList
 
 final int frameWidth = 800;
 final int frameHeight = 650;
@@ -340,50 +325,37 @@ int consoleBoxY= controlBoxY;
 int boxTitleHeight = 25;
 int boxTitleFontSize = 13;
 
-int lineCount = 0;
-int pointCount = 0;
-int segmentCount = 0;
-int currentSegment = 0;
-int commandRetryCount = 0;
-int coordinateType = 1;
+int lineCount = 0; //number of lines in the image. Used for Lines drawing
+int pointCount = 0; //number of pixels or points in an image. Used for Points drawing
+int segmentCount = 0; //number of discrete lines in the image. Used for Freehand drawing
+int currentSegment = 0; //current line, point or lines segment being plotted
+int commandRetryCount = 0; //retry count for failing initialization requests
+int coordinateType = 1; //identifies the type of coordinates
 
-int pixelLocation = 0;
-int pixelRed;
-int pixelGreen;
-int pixelBlue;
+int pixelLocation = 0; //pixel location or index in the image file array
+int pixelRed; //red value of a pixel
+int pixelGreen; //green value of a pixel
+int pixelBlue; //blue value of a pixel
 
-int runCount = 0;
-
-boolean pixelColor = false;
-boolean prevPixelColor = true;
-
-PImage imageSelected;
-
+boolean pixelColor = false; //stores color of a pixel as bool. true = black, false = white or transparent
+boolean prevPixelColor = true; //same as pixelColor
+PImage imageSelected; //selected image object
 String imageFilePath;
 
-int lineCountLimit = 2000;
+int lineCountLimit = 2000; //limit for lines coordinates for Lines method
 int [][][] lineCords = new int [2] [2] [lineCountLimit];
-
-int globalI, globalJ, globalK;
-
-String serialPortStatus;
-String serialComStatus;
 
 boolean isMainWindowStarted = false;
 boolean isInitialWindowStarted = false;
 boolean startMonitorSerial = false;
 boolean startMainWindow = false;
 boolean portSelectError;
-
 boolean waitingForResponse = false;
 
 boolean isImageLoaded = false;
 boolean isImageSelected = false;
 boolean isFilePromptOpen = false;
-boolean imageLoadError = false;
-boolean ifLoadimage = false;
 boolean isPlottingStarted = false;
-boolean isPlottingPaused = false;
 boolean isPlotterActive = false;
 boolean ifPlotterReady = false;
 boolean isPlottingFinished = false;
@@ -395,8 +367,6 @@ boolean ifPausePlotter = false;
 boolean ifResumePlotter = false;
 boolean ifStopPlotter = false;
 
-boolean isSerialActive = false;
-boolean ifCloseMainWindow = false;
 boolean isUpPressed = false;
 boolean isDownPressed = false;
 boolean isleftPressed = false;
@@ -408,15 +378,12 @@ boolean ifFreehand = false;
 boolean ifToMirror = false;
 
 int selectPortValue = -1; //virtual com port value
-int portCount = 0;
+int portCount = 0; //number of COM ports available
 int prevPortCount = 0;
-int portIndexLimit = -1;
+int portIndexLimit = -1; //index limit for port list
 int activePortValue = -1;
-int mouseStatusTemp = 0;
 int tempInt; //int variable for testing
 int comStatusCounter; //to check is the OBU is on and transmitting
-
-String versionNumber = "1.0.2";
 
 boolean startPressed = false; //for start button
 boolean quitPressed = false; //for quit button
@@ -427,9 +394,6 @@ boolean serialDisconnected = false;
 
 String selectPortName = "NONE"; //name of port selected
 String activePortName = "NONE";
-String serialBuffer; //string that holds read serial data
-String tempString; //string variable for testing
-String comStatus = "Disconnected";
 
 color colorWhite = #FFFFFF;
 color colorBlue = #006699;
@@ -444,14 +408,17 @@ color colorMediumBlack = 80;
 color colorTextField = 240;
 color colorDefaultButton = 235;
 
+//font vars
 PFont robotoFont, poppinsFont, segoeFont, h4Font, h5Font, h6Font, fontAwesome;
 
+//UI buttons
 uiButton startMainButton, quitAppButton, startAboutButton, portDecButton, portIncButton, quitMainButton;
 uiButton plotterUpButton, plotterDownButton, plotterLeftButton, plotterRightButton, plotterPenButton;
 uiButton plotterHomeButton;
 uiButton loadImageButton, linesButton, pointsButton, freehandButton;
 uiButton plotterStartButton, plotterPauseButton, plotterStopButton, plotterCalibrateButton;
 
+//labels for UI buttons
 uiButtonLabel plotterStartButtonLabel, plotterPauseButtonLabel, plotterResumeButtonLabel, plotterStopButtonLabel, plotterCalibrateButtonLabel;
 uiButtonLabel plotterUpArrow, plotterDownArrow, plotterLeftArrow, plotterRightArrow, plotterPenArrow, plotterPenCircle;
 uiButtonLabel plotterStartIcon, plotterPauseIcon, plotterResumeIcon, plotterStopIcon;
@@ -459,7 +426,7 @@ uiButtonLabel startMainButtonLabel, quitAppButtonLabel, aboutButtonLabel;
 uiButtonLabel loadImageButtonLabel, linesButtonLabel, pointsButtonLabel, freehandButtonLabel;
 uiButtonLabel portDecButtonLabel, portIncButtonLabel, quitMainButtonLabel;
 
-
+//text labels and boxes
 textLabel fileName, portNameLabel, currentTask, currentSerialComStatus, currentPlotterStatus, currentPlotterPosition;
 labelBox fileNameBox, portNameBox, serialComStatusBox, plotterStatusBox, plotterPositionBox, currentTaskBox;
 
@@ -601,7 +568,6 @@ void setup() {
   portIncButtonLabel.linkButton(portIncButton);
   quitMainButtonLabel.linkButton(quitMainButton);
 
-
   //normal standalone text labels
   //name, x, y, font, fontSize, color
   fileName = new textLabel ("None", 125, 152, segoeFont, boxTitleFontSize, colorMediumBlack);
@@ -705,7 +671,6 @@ void showInitialWindow() {
       if (selectPortValue > 0) {
         selectPortValue--;
         selectPortName = Serial.list()[selectPortValue];
-        mouseStatusTemp = 1;
         printVerbose("Port Decrement");
       }
     } else {
@@ -716,7 +681,6 @@ void showInitialWindow() {
       if ((selectPortValue < (Serial.list().length -1 )) && (selectPortValue > -1)) {
         selectPortValue++;
         selectPortName = Serial.list()[selectPortValue];
-        mouseStatusTemp = 1;
         printVerbose("Port Increment");
       }
     } else {
@@ -1302,6 +1266,7 @@ boolean resetAll() {
   selectPortName = "NONE";
   selectPortValue = -1;
   serialStatus = -1;
+  currentSerialComStatus.setLabel("Disconnected");
 
   isImageLoaded = false;
   isImageSelected = false;
@@ -1362,6 +1327,8 @@ boolean resetPlotter () {
   ifPausePlotter = false;
   ifStopPlotter = true;
 
+  currentPlotterStatus.setLabel("Idle");
+
   plotterStopButton.reset();
   plotterStopButtonLabel.reset();
   plotterStartButton.reset();
@@ -1407,6 +1374,7 @@ void establishSerial() {
       printVerbose("establishSerial-2");
       serialPort = new Serial(this, activePortName, 9600);
       activePortValue = selectPortValue;
+      currentSerialComStatus.setLabel("Connected");
       println("Serial Communication Established");
       println("Listing ports");
       println(Serial.list()); //list the available ports
@@ -1637,6 +1605,7 @@ void plotImage () {
 
           //------------------- Header Info Starts ---------------------------//
           if (currentSegment == 0) { //do only once
+            currentPlotterStatus.setLabel("Initializing");
             serialSendCommand("G251,W" + imageWidth + "," + "H" + imageHeight); //send image width and height
             delay(100);
             waitingForResponse = false; //does not confirm
@@ -1684,6 +1653,7 @@ void plotImage () {
               resetPlotter();
             }
             else if ((!isPlottingFinished) && (!ifStopPlotter)) { //if plotting has not finished yet
+              currentPlotterStatus.setLabel("Working");
               if ((!waitingForResponse) && (!ifStopPlotter)) {
                 if (((coordinateType == COORD_TYPE_END) || (coordinateType == COORD_TYPE_NONE)) && (!isPenDown) && (!ifStopPlotter)) { //check what type of coordiante was sent last. 2 = end, 1 = start
                   println();
@@ -1719,6 +1689,7 @@ void plotImage () {
                 if (serialCheckRespone("DONE!")) { //check response
                   waitingForResponse = false; //reset the flag
                 }
+                else currentSerialComStatus.setLabel("Waiting");
               }
             }
           }
@@ -1740,6 +1711,7 @@ void plotImage () {
       } //second while loop ends
 
       if((ifPausePlotter) && (!isPlotterWaiting)) {
+        currentPlotterStatus.setLabel("Paused");
         println();
         println("Plotting thread is waiting.");
         println();
@@ -1775,6 +1747,8 @@ void plotImage () {
     currentSegment = 0;
     waitingForResponse = false;
     coordinateType = COORD_TYPE_NONE;
+    currentSerialComStatus.setLabel("Connected");
+    currentPlotterStatus.setLabel("Idle");
   }
 
   if(!isCurrentPortActive()) { //if there's a port error - reset everything
@@ -1789,28 +1763,9 @@ void plotImage () {
     currentSegment = 0;
     waitingForResponse = false;
     coordinateType = 0;
+    currentSerialComStatus.setLabel("Connected");
     println("Thread has terminated abruptly !");
-  }
-}
-
-//=========================================================================//
-//redundant
-
-boolean waitForReply (String expectedResponse) {
-  while (true) {
-    if(isCurrentPortActive()) {
-      if(serialPort.available() > 0) {
-        String receivedResponse = serialPort.readStringUntil(DELIMITER);
-        if(receivedResponse != null) {
-          receivedResponse = removeDelimiter(receivedResponse);
-
-          if(receivedResponse == expectedResponse) {
-            serialPort.clear();
-            return true;
-          }
-        }
-      }
-    }
+    currentPlotterStatus.setLabel("Idle");
   }
 }
 
@@ -1820,6 +1775,7 @@ boolean waitForReply (String expectedResponse) {
 String serialReceiveRespone() {
   if(isCurrentPortActive()) { //check if port is available
     if (serialPort.available() > 0) {
+      currentSerialComStatus.setLabel("Receiving");
       String receivedResponse = serialPort.readStringUntil(DELIMITER); //read until
       if(receivedResponse != null) { //only if response is not null
         receivedResponse = removeDelimiter(receivedResponse); //remove delimiter
@@ -1842,6 +1798,7 @@ String serialReceiveRespone() {
 boolean serialCheckRespone (String expectedResponse) {
   if(isCurrentPortActive()) { //check if port is available
     if (serialPort.available() > 0) {
+      currentSerialComStatus.setLabel("Receiving");
       String receivedResponse = serialPort.readStringUntil(DELIMITER); //read the response from the buffer
       if((receivedResponse != null)) { //only if it's not null and valid with ; at the end
         receivedResponse = removeDelimiter(receivedResponse); //remove the delimiter
@@ -1892,6 +1849,7 @@ String removeDelimiter (String a) {
 
 boolean serialSendCommand(String commandString) {
   if(isCurrentPortActive()) { //check if port is alive
+    currentSerialComStatus.setLabel("Sending");
     serialPort.clear(); //not sure about this
     serialPort.write(commandString); //write to serial port
     serialPort.write(DELIMITER); //write the delimiter
