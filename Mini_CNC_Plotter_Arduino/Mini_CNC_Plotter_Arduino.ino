@@ -5,13 +5,12 @@
 //  Code for controlling three stepper drives in a CNC
 //  plotter. This uses Arduino Nano 328.
 //
-//  Swapped software serial ports with hardware serial
-//  Software serial is for debugging
+//  Modified the drawLine function : replaced relMoveTo with absMoveTo
 //
 //  Author : Vishnu M Aiea
 //  Web : www.vishnumaiea.in
 //  Date created : 10:48 PM 22-04-2017, Saturday
-//  Last modified : 01:01:26 AM, 04-06-2017, Sunday
+//  Last modified : 12:59:38 PM, 04-06-2017, Sunday
 //
 //=========================================================================//
 
@@ -142,15 +141,13 @@ void loop() {
 //=========================================================================//
 //draws line between two points
 
-bool line (int X1, int Y1, int X2, int Y2) {
+bool drawLine (int X1, int Y1, int X2, int Y2) {
   movePen(UP);
   absMoveTo(X1, Y1, PIXELS); //move to starting coordinate of line
   delay(50);
   movePen(DOWN); //move the pen down
-  X2 -= X1; //subtract the absolute values from the starting coordinates
-  Y2 -= Y1; //so as to calculate the relative distance to the end point
   delay(drawDelay);
-  relMoveTo(X2, Y2); //relative movement
+  absMoveTo(X2, Y2, PIXELS); //abs movement to the end of the line
   delay(50);
   movePen(UP); //move the pen up
   return true;
