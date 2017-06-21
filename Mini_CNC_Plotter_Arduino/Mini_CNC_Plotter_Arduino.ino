@@ -22,6 +22,10 @@
 #define DELIMITER ';'
 #define STEPS "STEPS"
 #define PIXELS "PIXELS"
+#define HW_SERIAl_BAUDRATE 9600 //bps
+#define SW_SERIAl_BAUDRATE 9600 //bps
+#define HW_SERIAl_TIMEOUT 20 //ms
+#define SW_SERIAl_TIMEOUT 20 //ms
 
 int LED_PIN = 13;
 
@@ -115,14 +119,10 @@ void setup() {
 
   pinMode(LED_PIN, OUTPUT); //for debugging
 
-  Serial.begin(9600);
-  while (!Serial) {
-    ;
-  }
-
-  mySerial.begin(9600);
-  mySerial.setTimeout(20); //set timeout for each serial port
-  Serial.setTimeout(20);
+  Serial.begin(HW_SERIAl_BAUDRATE);
+  mySerial.begin(SW_SERIAl_BAUDRATE);
+  mySerial.setTimeout(SW_SERIAl_TIMEOUT); //set timeout for each serial port
+  Serial.setTimeout(HW_SERIAl_TIMEOUT);
   mySerial.println("I'm ready!");
 }
 
@@ -265,24 +265,28 @@ bool relMoveTo(int targetPixelX, int targetPixelY) {
 }
 
 //=========================================================================//
+//converts X pixel count to X motor's steps
 
 int convertToStepsX (int pixelCountX) {
   return ((pixelSize * pixelCountX) / precisionX); //convert to steps
 }
 
 //=========================================================================//
+//converts Y pixel count to Y motor's steps
 
 int convertToStepsY (int pixelCountY) {
   return ((pixelSize * pixelCountY) / precisionY); //convert to steps
 }
 
 //=========================================================================//
+//converts X steps to approximate X pixel location
 
 int convertToPixelX (int stepsCountX) {
   return ((stepsCountX * precisionX) / pixelSize);
 }
 
 //=========================================================================//
+//converts Y steps to approximate Y pixel location
 
 int convertToPixelY (int stepsCountY) {
   return ((stepsCountY * precisionY) / pixelSize);
@@ -359,7 +363,7 @@ bool calibXY (bool startCalib) {
 }
 
 //=========================================================================//
-//removes a specified char from a string
+//removes all the instances of a specified char from a string
 
 void removeChar (String a, char b) {
   int i = a.indexOf(b);

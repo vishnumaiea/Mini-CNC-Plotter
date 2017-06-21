@@ -3,13 +3,14 @@
 
 //   -- Mini CNC Plotter --
 //
-//   Added realtime stats to the info window.
+//   Added about window with back button, new box classes, text and rect
+//   functions.
 //
 //   Author : Vishnu M Aiea
 //   E-Mail : vishnumaiea@gmail.com
 //   Web : www.vishnumaiea.in
 //   Date created : 12:20 PM 27-04-2017, Thursday
-//   Last modified : 09:12:26 PM, 03-06-2017, Saturday
+//   Last modified : 11:17:31 PM, 21-06-2017, Wednesday
 
 //=========================================================================//
 
@@ -347,6 +348,54 @@ public class labelBox {
   }
 } //labelBox class ends
 
+//=========================================================================//
+
+public class childBox {
+  int boxWidth, boxHeight, boxX, boxY, headerHeight, titleX, titleY, titleFontSize;
+  color boxColor, headerColor, titleColor;
+  PFont titleFont;
+  String titleName;
+
+  //x, y, width, height, headerHeight, titleName, titleX, titleY, titleFont, titleFontSize, boxColor, headerColor, titleColor
+  childBox (int a, int b, int c, int d, int e, String f, int g, int h, PFont i, int j, color k, color l, color m) {
+    boxX = a;
+    boxY = b;
+    boxWidth = c;
+    boxHeight = d;
+    headerHeight = e;
+    titleName = f;
+    titleX = g;
+    titleY = h;
+    titleFont = i;
+    titleFontSize = j;
+    boxColor = k;
+    headerColor = l;
+    titleColor = m;
+  }
+
+  void display () {
+    fill(headerColor);
+    rect(boxX, boxY, boxWidth, headerHeight);
+    fill(titleColor);
+    textFont(titleFont, titleFontSize);
+    text(titleName, boxX + titleX, boxY + titleY);
+    fill(boxColor);
+    rect(boxX, boxY + headerHeight, boxWidth, boxHeight - headerHeight);
+  }
+
+  void setTitle (String a) {
+    titleName = a;
+  }
+
+  void setBoxColor (color a) {
+    boxColor = a;
+  }
+
+  void setHeaderColor (color a) {
+    headerColor = a;
+  }
+}
+
 //class definitons end
 //=========================================================================//
 
@@ -355,16 +404,26 @@ int COORD_TYPE_START = 1;
 int COORD_TYPE_END = 2;
 int COORD_TYPE_DOWN = 3;
 
-String versionNumber = "1.0.8";
+int SERIAL_WAIT_DELAY = 200;
+char DELIMITER = ';'; //delimiter
+
+String VERSION_NUMBER = "1.1.5";
+String RELEASE_DATE = "IST 11:08:42 PM, 21-06-2017, Wednesday";
+String AUTHOR = "Vishnu M Aiea";
+String SOURCE_WEBSITE = "https://github.com/vishnumaiea/Mini-CNC-Plotter";
+String AUTHOR_WEBSITE = "www.vishnumaiea.in";
+
+String ALIGN_CENTER = "CENTER";
+String ALIGN_RIGHT = "RIGHT";
+String ALIGN_LEFT = "LEFT";
+String ALIGN_TOP = "TOP";
+String ALIGN_BOTTOM = "BOTTOM";
 
 //list of human readable error status
 String [] serialStatusList = {"Error : Could not find the port specified !",
                              "Error : Device disconnected !",
                              "Serial ended !",
                              "No ports available !"};
-
-int SERIAL_WAIT_DELAY = 200;
-char DELIMITER = ';'; //delimiter
 
 int serialStatus = -1; //used as index to select from serialStatusList
 
@@ -489,6 +548,7 @@ uiButton plotterUpButton, plotterDownButton, plotterLeftButton, plotterRightButt
 uiButton plotterHomeButton;
 uiButton loadImageButton, linesButton, pointsButton, freehandButton;
 uiButton plotterStartButton, plotterPauseButton, plotterStopButton, plotterCalibrateButton;
+uiButton backButton;
 
 //labels for UI buttons
 uiButtonLabel plotterStartButtonLabel, plotterPauseButtonLabel, plotterResumeButtonLabel, plotterStopButtonLabel, plotterCalibrateButtonLabel;
@@ -497,6 +557,7 @@ uiButtonLabel plotterStartIcon, plotterPauseIcon, plotterResumeIcon, plotterStop
 uiButtonLabel startMainButtonLabel, quitAppButtonLabel, aboutButtonLabel;
 uiButtonLabel loadImageButtonLabel, linesButtonLabel, pointsButtonLabel, freehandButtonLabel;
 uiButtonLabel portDecButtonLabel, portIncButtonLabel, quitMainButtonLabel;
+uiButtonLabel backButtonLabel;
 
 //text labels and boxes
 textLabel fileName, portNameLabel, currentTask, currentSerialComStatus, currentPlotterStatus, currentPlotterPosition;
@@ -508,7 +569,7 @@ void setup() {
   size(800, 655);
   background(colorDarkGrey);
 
-  surface.setTitle("Processing PNG Image");
+  surface.setTitle("Mini CNC Plotter - Vishnu M Aiea");
 
   poppinsFont = createFont("Poppins Medium", 20); //font for about
   segoeFont = createFont("Segoe UI SemiBold", 20);
@@ -519,6 +580,9 @@ void setup() {
 
   //instantiating labels
   //name, X, Y, font, fontSize, labelColor, hoverColor, pressedColor, activeColor, button
+
+  backButtonLabel = new uiButtonLabel ("BACK", 23, 23, segoeFont, 14, colorBlue, colorWhite, colorOrange, colorBlue);
+
   plotterUpArrow = new uiButtonLabel ("",8, 40, fontAwesome, 40, colorMediumGrey, colorBlue, colorOrange, colorOrange);
   plotterDownArrow = new uiButtonLabel ("", 8, 40, fontAwesome, 40, colorMediumGrey, colorBlue, colorOrange, colorOrange);
   plotterLeftArrow = new uiButtonLabel ("", 8, 40, fontAwesome, 40, colorMediumGrey, colorBlue, colorOrange, colorOrange);
@@ -554,6 +618,8 @@ void setup() {
 
   //instantiating buttons
   //(X, Y, W, H, Label, buttonColor, buttonHoverColor, buttonLabelColor, buttonLabelHoverColor
+  backButton = new uiButton (360, 530, 80, 35, colorWhite, colorBlue, colorBlue, colorWhite);
+
   startMainButton = new uiButton (220, 480, 80, 35, colorWhite, colorBlue, colorBlue, colorWhite);
   quitAppButton = new uiButton (360, 480, 80, 35, colorWhite, colorBlue, colorBlue, colorWhite);
   startAboutButton = new uiButton (500, 480, 80, 35, colorWhite, colorBlue, colorBlue, colorWhite);
@@ -583,6 +649,8 @@ void setup() {
 
   //link the button labels to the buttons
 
+  backButton.linkLabel(backButtonLabel);
+
   startMainButton.linkLabel(startMainButtonLabel);
   quitAppButton.linkLabel(quitAppButtonLabel);
   startAboutButton.linkLabel(aboutButtonLabel);
@@ -609,6 +677,8 @@ void setup() {
   //---------------------------------------------------------------//
 
   //link the buttons to the labels
+
+  backButtonLabel.linkButton(backButton);
 
   plotterStartButtonLabel.linkButton(plotterStartButton);
   plotterPauseButtonLabel.linkButton(plotterPauseButton);
@@ -662,22 +732,22 @@ void setup() {
 
 void draw() {
   if ((!startPressed) && (!aboutPressed)) {
-    showInitialWindow();
+    displayInitialWindow();
   }
 
   if (startPressed) {
-    showMainWindow();
+    displayMainWindow();
   }
 
   if (aboutPressed) {
-    showAboutWindow();
+    displayAboutWindow();
   }
 }
 
 //=========================================================================//
 
-void showInitialWindow() {
-  showInitialStaticInfo();
+void displayInitialWindow() {
+  displayInitialStaticInfo();
 
   if (isPortError) { //check wether a port error occurred in main window
     isPortError = false;
@@ -799,7 +869,7 @@ void showInitialWindow() {
 //=========================================================================//
 //displays static titles and stuff
 
-void showInitialStaticInfo () {
+void displayInitialStaticInfo () {
   smooth();
   noStroke();
   background(colorDarkGrey);
@@ -823,7 +893,7 @@ void showInitialStaticInfo () {
   textFont(poppinsFont, 12);
   fill(colorMediumGrey);
   text("Version", 355, 170);
-  text(versionNumber, 405, 170);
+  text(VERSION_NUMBER, 405, 170);
 
   textFont(poppinsFont, 12);
   fill(colorMediumGrey);
@@ -872,8 +942,124 @@ void printVerbose(String verboseLocation) {
 }
 
 //=========================================================================//
+//shows the about, credits, getting started tutorial etc
 
-void showMainWindow() {
+void displayAboutWindow() {
+  if(aboutPressed) {
+    smooth();
+    noStroke();
+    background(colorDarkGrey);
+
+    displayRect(125, 50, 550, 120, colorBlue); //first box in initial window
+    displayRect(125, 170, 550, 340, colorWhite); //second box in initial window
+    displayRect(125, 510, 550, 75, colorLightGrey); //second box in initial window
+
+    setTextProperties(poppinsFont, 26);
+    displayText("MINI CNC PLOTTER", colorWhite, 283, 95);
+    setTextProperties(poppinsFont, 12);
+    displayText("Version", colorMediumGrey, 355, 125);
+    displayText(VERSION_NUMBER, colorMediumGrey, 405, 125);
+    displayText("© 2017  Vishnu M Aiea", colorMediumGrey, 332, 150);
+
+    //displayRect(0, 0, 500, 85, colorBlue, ALIGN_CENTER, frameWidth);
+    //displayRect(0, 85, 500, frameHeight, colorWhite, ALIGN_CENTER, frameWidth);
+    /*
+    displayRect(0, 0, frameWidth, 85, colorBlue);
+    displayRect(0, 85, frameWidth, frameHeight, colorWhite);
+    setTextProperties(poppinsFont, 25);
+    displayText("MINI CNC PLOTTER", colorWhite, 280, 37);
+    setTextProperties(poppinsFont, 12);
+    displayText("Version", colorMediumGrey, 345, 62);
+    displayText(VERSION_NUMBER, colorMediumGrey, 395, 62);*/
+
+    setTextProperties(poppinsFont, 13);
+    displayText("This is a control software designed for drawing graphics with", colorMediumBlack, ALIGN_CENTER, 120, 125, 100, 550);
+    displayText("CNC plotters made from CD stepper drives.", colorMediumBlack, ALIGN_CENTER, 145, 125, 100, 550);
+    displayText("The software is designed in ", "Processing.", colorMediumBlack, colorBlue, ALIGN_CENTER, 170, 125, 100, 550);
+    displayText("Full tutorial is available at author's website.", colorMediumBlack, ALIGN_CENTER, 195, 125, 100, 550);
+    setTextProperties(poppinsFont, 13);
+    displayText("Version : ", VERSION_NUMBER, colorMediumBlack, colorBlue, ALIGN_CENTER, 247, 125, 100, 550);
+    displayText("Developed by  ", "Vishnu M Aiea", colorMediumBlack, colorBlue, ALIGN_CENTER, 272, 125, 100, 550);
+    displayText("License : ", "MIT License, Copyright © 2017  Vishnu M Aiea", colorMediumBlack, colorBlue, ALIGN_CENTER, 297, 125, 100, 550);
+    displayText("Release date : ", RELEASE_DATE, colorMediumBlack, colorBlue, ALIGN_CENTER, 322, 125, 100, 550);
+    displayText("GitHub : ", SOURCE_WEBSITE, colorMediumBlack, colorBlue, ALIGN_CENTER, 347, 125, 100, 550);
+    displayText("Author's Wesbite : ", AUTHOR_WEBSITE, colorMediumBlack, colorBlue, ALIGN_CENTER, 372, 125, 100, 550);
+
+    backButton.display();
+    if (backButton.isClicked())
+    aboutPressed = false;
+  }
+}
+
+//=========================================================================//
+
+void displayRect (int x, int y, int w, int h, color c) {
+  fill(c);
+  rect(x, y, w, h);
+}
+
+//=========================================================================//
+
+void displayRect (int x, int y,int w, int h, color c, String align, int parentWidth, int parentHeight) {
+  fill(c);
+  if(align.equals(ALIGN_CENTER))
+  rect((((parentWidth-w)/2)+x), (((parentHeight-h)/2)+y), w, h);
+}
+
+//=========================================================================//
+
+void displayRect (int x, int y,int w, int h, color c, String align, int parentWidth) {
+  fill(c);
+  if(align.equals(ALIGN_CENTER))
+  rect((((parentWidth-w)/2)+x), y, w, h);
+}
+
+//=========================================================================//
+
+void setTextProperties (PFont font, int fontSize) {
+  textFont(font, fontSize);
+}
+
+//=========================================================================//
+
+void displayText (String a, color b, int x, int y) {
+  fill(b);
+  text(a, x, y);
+}
+
+//=========================================================================//
+
+void displayText (String a, color b, int x, int y, int parentX, int parentY) {
+  fill(b);
+  text(a, parentX+x, parentY+y);
+}
+
+//=========================================================================//
+
+void displayText (String a, color b, String align,int y, int parentX, int parentY, int parentWidth) {
+  fill(b);
+  if(align.equals(ALIGN_CENTER))
+  text(a, (((parentWidth - textWidth(a))/2) + parentX), (y+parentY));
+}
+
+//=========================================================================//
+
+void displayText (String a, String b, color c, color d, String align, int y, int parentX, int parentY, int parentWidth) {
+  String combinedString = a + b;
+  int firstStringWidth = (int) textWidth(a);
+  int secondStringWidth = (int) textWidth(b);
+  int combinedStringWidth = (int) textWidth(combinedString);
+
+  fill(c);
+  if(align.equals(ALIGN_CENTER))
+  text(a, (((parentWidth - combinedStringWidth)/2) + parentX), (y+parentY));
+  fill(d);
+  text(b, (((parentWidth - combinedStringWidth)/2) + firstStringWidth + parentX), (y+parentY));
+}
+
+//=========================================================================//
+
+void displayMainWindow() {
 
   //------------------------------------------//
 
@@ -930,17 +1116,12 @@ void showMainWindow() {
 
     //----------- Static Title -------------------------//
 
-    fill(colorBlue);
-    rect(0, 0, 800, 75);
-
-    textFont(poppinsFont, 25);
-    fill(colorWhite);
-    text("MINI CNC PLOTTER", 280, 37);
-
-    textFont(poppinsFont, 12);
-    fill(colorMediumGrey);
-    text("Version", 345, 62);
-    text(versionNumber, 395, 62);
+    displayRect(0, 0, 800, 600, colorBlue);
+    setTextProperties(poppinsFont, 25);
+    displayText("MINI CNC PLOTTER", colorWhite, 280, 37);
+    setTextProperties(poppinsFont, 12);
+    displayText("Version", colorMediumGrey, 345, 62);
+    displayText(VERSION_NUMBER, colorMediumGrey, 395, 62);
 
     //----------- Static Title Ends --------------------//
 
@@ -1511,13 +1692,6 @@ boolean isCurrentPortActive () {
 }
 
 //=========================================================================//
-//shows the about, credits, getting started tutorial etc
-
-void showAboutWindow() {
-  showInitialWindow();
-}
-
-//=========================================================================//
 
 //opens file selection prompt and let you select a file
 
@@ -1780,13 +1954,13 @@ void plotImage () {
           //------------ Lines end -------------//
 
           //---------- Points start -------------//
-          if ((ifPoints) && (!isPlottingFinished) && (isCurrentPortActive())) {
+          if ((ifPoints) && (!isPlottingFinished) && (isCurrentPortActive()) && (!ifStopPlotter)) {
             println("Points : Feature not supported yet.");
           }
           //------------ Points end -------------//
 
           //---------- Freehand starts -------------//
-          if ((ifFreehand) && (!isPlottingFinished) && (isCurrentPortActive())) {
+          if ((ifFreehand) && (!isPlottingFinished) && (isCurrentPortActive()) && (!ifStopPlotter)) {
             println("Freehand : Feature not supported yet.");
           }
           //------------ Freehand ends -------------//
@@ -1804,15 +1978,7 @@ void plotImage () {
     } //main while loop ends
   }
 
-  if((ifStopPlotter) && (!isPlottingFinished)) {
-    println();
-    println("Plotting has been cancelled !");
-    serialSendCommand("M30");
-    delay(50);
-    isPlotterActive = false;
-  }
-
-  else if (ifStopPlotter) {
+  if (ifStopPlotter) {
     println();
     println("Plotting has been cancelled !");
     serialSendCommand("M30");
@@ -1821,6 +1987,7 @@ void plotImage () {
   }
 
   if ((ifStopPlotter) || (isPlottingFinished)) { //if plotting is finished or if to stop plotting
+    ifStopPlotter = true;
     isPlottingFinished = true;
     isPlottingStarted = false;
     ifStartPlotter = false;
