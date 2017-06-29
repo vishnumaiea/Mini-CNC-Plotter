@@ -3,14 +3,14 @@
 
 //   -- Mini CNC Plotter --
 //
-//   Added about window with back button, new box classes, text and rect
-//   functions.
+//   Added all the required fonts to data folder.
+//
 //
 //   Author : Vishnu M Aiea
 //   E-Mail : vishnumaiea@gmail.com
 //   Web : www.vishnumaiea.in
 //   Date created : 12:20 PM 27-04-2017, Thursday
-//   Last modified : 11:17:31 PM, 21-06-2017, Wednesday
+//   Last modified : 11:47:12 AM, 29-06-2017, Thursday
 
 //=========================================================================//
 
@@ -571,9 +571,9 @@ void setup() {
 
   surface.setTitle("Mini CNC Plotter - Vishnu M Aiea");
 
-  poppinsFont = createFont("Poppins Medium", 20); //font for about
-  segoeFont = createFont("Segoe UI SemiBold", 20);
-  fontAwesome = createFont("FontAwesome", 20);
+  poppinsFont = createFont("poppins-medium.ttf", 20); //load ttf fonts from "data" folder
+  segoeFont = createFont("seguisb.ttf", 20);
+  fontAwesome = createFont("fontawesome-webfont.ttf", 20);
 
   imageHeight = 327;
   imageWidth = 250;
@@ -961,17 +961,6 @@ void displayAboutWindow() {
     displayText(VERSION_NUMBER, colorMediumGrey, 405, 125);
     displayText("© 2017  Vishnu M Aiea", colorMediumGrey, 332, 150);
 
-    //displayRect(0, 0, 500, 85, colorBlue, ALIGN_CENTER, frameWidth);
-    //displayRect(0, 85, 500, frameHeight, colorWhite, ALIGN_CENTER, frameWidth);
-    /*
-    displayRect(0, 0, frameWidth, 85, colorBlue);
-    displayRect(0, 85, frameWidth, frameHeight, colorWhite);
-    setTextProperties(poppinsFont, 25);
-    displayText("MINI CNC PLOTTER", colorWhite, 280, 37);
-    setTextProperties(poppinsFont, 12);
-    displayText("Version", colorMediumGrey, 345, 62);
-    displayText(VERSION_NUMBER, colorMediumGrey, 395, 62);*/
-
     setTextProperties(poppinsFont, 13);
     displayText("This is a control software designed for drawing graphics with", colorMediumBlack, ALIGN_CENTER, 120, 125, 100, 550);
     displayText("CNC plotters made from CD stepper drives.", colorMediumBlack, ALIGN_CENTER, 145, 125, 100, 550);
@@ -1195,7 +1184,7 @@ void displayMainWindow() {
     if ((loadImageButton.isClicked()) && (!isFilePromptOpen)) { //if button clicked and prompt is not already open
       if (!isImageLoaded) {
         isFilePromptOpen = true; //file prompt is now open
-        selectInput("Select a PNG file :", "selectImageFile");
+        selectInput("Select a PNG file :", "selectImageFile"); //the 2nd parameter is actually a function
       }
     }
 
