@@ -18,8 +18,7 @@ This source repository is distributed under MIT License.
   3. Click the "Run" button in Processing which will create an instantiation of the program.
   4. You may need to install Java Runtime Environment (JRE) to run the application.
   5. You can use the "Export Application" feature in Processing to create executable files for preferred OSs.
-<br>
-<br>
+
 
 ## How to use the application ?
 
