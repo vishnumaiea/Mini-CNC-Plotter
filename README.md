@@ -11,7 +11,6 @@ This project will be available at : http://www.vishnumaiea.in/projects/hardware/
 This source repository is distributed under MIT License.
 <br>
 <br>
-<br>
 ## How to use this ?
 
 1. First go to www.processing.org and download the Processing version for your operating system and install it.
