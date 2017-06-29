@@ -10,7 +10,7 @@
 //   E-Mail : vishnumaiea@gmail.com
 //   Web : www.vishnumaiea.in
 //   Date created : 12:20 PM 27-04-2017, Thursday
-//   Last modified : 11:47:12 AM, 29-06-2017, Thursday
+//   Last modified : 12:00:44 PM, 29-06-2017, Thursday
 
 //=========================================================================//
 
@@ -407,8 +407,8 @@ int COORD_TYPE_DOWN = 3;
 int SERIAL_WAIT_DELAY = 200;
 char DELIMITER = ';'; //delimiter
 
-String VERSION_NUMBER = "1.1.5";
-String RELEASE_DATE = "IST 11:08:42 PM, 21-06-2017, Wednesday";
+String VERSION_NUMBER = "1.1.6";
+String RELEASE_DATE = "IST 12:00:56 PM, 29-06-2017, Thursday";
 String AUTHOR = "Vishnu M Aiea";
 String SOURCE_WEBSITE = "https://github.com/vishnumaiea/Mini-CNC-Plotter";
 String AUTHOR_WEBSITE = "www.vishnumaiea.in";
