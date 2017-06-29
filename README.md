@@ -20,6 +20,7 @@ This source repository is distributed under MIT License.
   5. You can use the "Export Application" feature in Processing to create executable files for preferred OSs.
 <br>
 <br>
+
 ## How to use the application ?
 
   1. Connect the plotter to the computer and determine the COM it assigned to.
