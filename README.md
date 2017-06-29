@@ -25,5 +25,6 @@ This source repository is distributed under MIT License.
   1. Connect the plotter to the computer and determine the COM it is assigned to.
   2. Run the application and select the COM port in the initial window and press START.
   3. Select a plotting method from Lines, Freehand and Points.
-  4. Select a BITMAP/PNG image with a resolution of 327 x 250 pixels using the Load Image button. Some sample images are available in the "data" folder.
+  4. Select a BITMAP/PNG image with a resolution of 327 x 250 pixels using the Load Image button. 
+  Some sample images are available in the "data" folder.
   5. Click Start for start plotting, Pause for pausing and resuming.
