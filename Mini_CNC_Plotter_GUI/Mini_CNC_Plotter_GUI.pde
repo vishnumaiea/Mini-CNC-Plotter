@@ -18,8 +18,1171 @@ import processing.serial.*;
 Serial serialPort;
 
 //=========================================================================//
+//freehand algorithm specific definitons
+
+static final int EDGE_MARKER = 120; //pixel markers
+static final int END_MARKER = 50;
+static final int NIB_MARKER = 57;
+static final int START_MARKER = 68;
+static final int CORNER_MARKER = 70;
+static final int ISOLATED_MARKER = 87;
+static final int POINT_MARKER = 93;
+static final int INVALID = -1;
+
+static final int DEFAULT_IMAGE_WIDTH = 600;
+static final int DEFAULT_IMAGE_HEIGHT = 600;
+
+//debug and error severity levels
+static final int SEVERITY_CRITICAL = 10;
+static final int SEVERITY_HIGH = 9;
+static final int SEVERITY_MEDIUM = 8;
+static final int SEVERITY_INFO = 7;
+static final int SEVERITY_WARNING = 6;
+static final int SEVERITY_MESSAGE = 5;
+static final int SEVERITY_VERBOSE = 4;
+
+imgObject selectedImage; //array for image
+imgObject outlineImage;
+imgObject solidImage;
+
+int iterationCount;
+int EXIT_AT_ERROR = 1;
+int DEBUG_LEVEL = SEVERITY_CRITICAL;
+
+int L = -1;
+int TL = -1 * (DEFAULT_IMAGE_WIDTH + 1); //assuming opened image has default W and H
+int T = -1 * (DEFAULT_IMAGE_WIDTH);
+int TR = -1 * (DEFAULT_IMAGE_WIDTH - 1);
+int R = 1;
+int BR = (DEFAULT_IMAGE_WIDTH + 1);
+int B = DEFAULT_IMAGE_WIDTH;
+int BL = (DEFAULT_IMAGE_WIDTH - 1);
+
+//scanning pattern for array postitions
+int [] scanningPattern = new int [] {L, TL, T, TR, R, BR, B, BL}; //square pattern
+//int [] scanningPattern = new int [L, T, R, B, TL, TR, BR, BL]; //diamond pattern
+//int [] scanningPattern = new int [TL, TR, BR, BL, L, T, R, B]; //star pattern
+
+//scanning pattern for XY coordinates
+//int [] scanningPatternX = new int [] {-1, -1, 0, 1, 1, 1, 0, -1}; //L, TL, T, TR, R, BR, B, BL - cyclic pattern
+//int [] scanningPatternY = new int [] {0, -1, -1, -1, 0, 1, 1, 1}; //L, TL, T, TR, R, BR, B, BL
+
+int [] scanningPatternX = new int [] {-1, 0, 1, 0, -1, -1, 1, 1}; //L, T, R, B, BL, TL, TR, BR - diamond pattern (friends first)
+int [] scanningPatternY = new int [] {0, -1, 0, 1, 1, -1, -1, 1}; //L, T, R, B, BL, TL, TR, BR
+
+//=========================================================================//
 //class definitons
 
+//-------------------------------------------------------------------------//
+//image object class
+
+public class imgObject {
+
+  public class pixelObject {
+    int X, Y, position;
+    int [] adjacentPixels = new int[8];
+
+    //=========================================================================//
+    pixelObject () { //empty constructor
+      X = 0;
+      Y = 0;
+      position = 0;
+    }
+    //-------------------------------------------------------------------------//
+
+    pixelObject (int a) { //takes pixel postion in array
+      position = a;
+      X = (position % imageWidth);
+      Y = (position - (position % imageWidth)) / imageWidth;
+    }
+    //-------------------------------------------------------------------------//
+
+    pixelObject (pixelObject sourceObject) { //copy constructor
+      this.X = sourceObject.X;
+      this.Y = sourceObject.Y;
+      sourceObject.position = (sourceObject.X + (sourceObject.Y * imageWidth));
+      this.position = sourceObject.position;
+    }
+    //=========================================================================//
+
+    int getPosition() {
+      calculatePosition(); //find the pixel location in PImage from coords
+      return position;
+    }
+    //=========================================================================//
+    //sets values of the pixel object
+
+    void set(int a) { //takes array position
+      if(a >= 0) {
+        position = a;
+        calculateXY();
+        findAdjacentPixels();
+      }
+      else if(a == INVALID) {
+        position = INVALID;
+        X = INVALID;
+        Y = INVALID;
+      }
+      else {
+        if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+          println("Error at set(int) : Negative input : " + a);
+          println("Current Pixel : Position = " + currentPixel.position + " X = " + currentPixel.X + " Y = " + currentPixel.Y);
+        }
+        if(EXIT_AT_ERROR == 1) System.exit(-1);
+      }
+    }
+    //-------------------------------------------------------------------------//
+
+    void set(pixelObject sourceObject) { //takes a pixel object
+      this.X = sourceObject.X; //copy X value
+      this.Y = sourceObject.Y; //copy Y value
+      sourceObject.position = (sourceObject.X + (sourceObject.Y * imageWidth)); //recalculate both positions
+      this.position = sourceObject.position;
+      findAdjacentPixels();
+    }
+    //-------------------------------------------------------------------------//
+
+    void set(int x, int y) {
+      if((x >= 0) && (y >= 0) && (x < imageWidth) && (y < imageHeight)) {
+        X = x;
+        Y = y;
+        calculatePosition();
+        findAdjacentPixels();
+      }
+      else {
+        if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+          println("Error at set(int, int) : XY out of bound");
+        }
+        if(EXIT_AT_ERROR == 1) System.exit(-1);
+      }
+    }
+    //=========================================================================//
+
+    void calculateXY() {
+      X = (position % imageWidth); //calculate X from position
+      Y = (position - (position % imageWidth)) / imageWidth; //calculate Y from position
+    }
+    //=========================================================================//
+
+    void calculatePosition() {
+      position = (X + (Y * imageWidth)); //find the pixel location in PImage from coords
+    }
+
+    //=========================================================================//
+    //finds all the 8 (excpet boundary pixels) adjacent pixels of a pixel
+
+    void findAdjacentPixels () {
+      calculateXY();
+      int x, y;
+
+      for(int i=0; i<8; i++) {
+        x = X + scanningPatternX[i]; //calculate the adjacent pixel's x
+        y = Y + scanningPatternY[i]; //calculate the adjacent pixel's y
+
+        if((x>=0) && (y>=0) && (x < imageWidth) && (y < imageHeight)) { //if within limits
+          adjacentPixels[i] = (x + (y * imageWidth)); //save as positions
+        }
+        else {
+          adjacentPixels[i] = INVALID;
+        }
+      }
+    }
+    //=========================================================================//
+    //determines if a pixel is friend of the pixel object
+
+    boolean isFriend (int pos) { //position in image array
+      if((pos < 0) || (pos > ((imageWidth * imageHeight)-1))) {
+        if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+          println("Error at isFriend(int) : invalid position parameter");
+        }
+        if(EXIT_AT_ERROR == 1) System.exit(-1);
+      }
+
+      int x = (pos % imageWidth); //calculate X from position
+      int y = (pos - (pos % imageWidth)) / imageWidth; //calculate Y from position
+      calculateXY(); //recalculate pixel objects coordinates
+      if(!isPixelBlack(pos)) return false;
+
+      else {
+        if((x == X) && (y == (Y-1))) return true; //top
+        else if((x == (X+1)) && (y == Y)) return true; //right
+        else if((x == X) && (y == (Y+1))) return true; //bottom
+        else if((x == (X-1)) && (y == Y)) return true; //left
+        else return false;
+      }
+    }
+    //-------------------------------------------------------------------------//
+    //overloaded version
+
+    boolean isFriend (int x, int y) {
+      if((x<0) || (y<0) || (x > (imageWidth-1)) || (y > (imageHeight-1))) {
+        if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+          println("Error at isFriend(int, int) : invalid input coordinates");
+        }
+        if(EXIT_AT_ERROR == 1) System.exit(-1);
+      }
+      calculateXY(); //recalculate pixel objects coordinates
+      if(!isPixelBlack(x, y)) return false;
+
+      else {
+        if((x == X) && (y == (Y-1))) return true; //top
+        else if((x == (X+1)) && (y == Y)) return true; //right
+        else if((x == X) && (y == (Y+1))) return true; //bottom
+        else if((x == (X-1)) && (y == Y)) return true; //left
+        else return false;
+      }
+    }
+    //=========================================================================//
+    //checks if a pixel is neighbor of the pixel object
+
+    boolean isNeighbor (int pos) {
+      if((pos < 0) || (pos > ((imageWidth * imageHeight)-1))) {
+        if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+          println("Error at isNeighbor(int) : invalid position parameter");
+        }
+        if(EXIT_AT_ERROR == 1) System.exit(-1);
+      }
+
+      int x = (pos % imageWidth); //calculate X from position
+      int y = (pos - (pos % imageWidth)) / imageWidth; //calculate Y from position
+      calculateXY(); //recalculate pixel objects coordinates
+      if(!isPixelBlack(pos)) return false;
+
+      else {
+        if((x == (X-1)) && (y == (Y-1))) return true; //top-left
+        else if((x == (X+1)) && (y == (Y-1))) return true; //top-right
+        else if((x == (X+1)) && (y == (Y+1))) return true; //bottom-right
+        else if((x == (X-1)) && (y == (Y+1))) return true; //bottom-left
+        else return false;
+      }
+    }
+
+    //-------------------------------------------------------------------------//
+    //overloaded version
+
+    boolean isNeighbor (int x, int y) {
+      if((x<0) || (y<0) || (x > (imageWidth-1)) || (y > (imageHeight-1))) {
+        if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+          println("Error at isNeighbor(int, int) : invalid input coordinates");
+        }
+        if(EXIT_AT_ERROR == 1) System.exit(-1);
+      }
+      calculateXY(); //recalculate pixel objects coordinates
+      if(!isPixelBlack(x, y)) return false;
+
+      else {
+        if((x == (X-1)) && (y == (Y-1))) return true; //top-left
+        else if((x == (X+1)) && (y == (Y-1))) return true; //top-right
+        else if((x == (X+1)) && (y == (Y+1))) return true; //bottom-right
+        else if((x == (X-1)) && (y == (Y+1))) return true; //bottom-left
+        else return false;
+      }
+    }
+    //=========================================================================//
+    //determines if a pixel is either a neighbor or friend of the pixel object
+
+    boolean isAdjacent (int pos) {
+      if((pos < 0) || (pos > ((imageWidth * imageHeight)-1))) {
+        if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+          println("Error at isAdjacent(int) : invalid position parameter");
+        }
+        if(EXIT_AT_ERROR == 1) System.exit(-1);
+      }
+
+      calculateXY(); //recalculate pixel objects coordinates
+      if(!isPixelBlack(pos)) return false;
+
+      else if(isFriend(pos) || isNeighbor(pos)) return true;
+      else return false;
+    }
+
+    //-------------------------------------------------------------------------//
+
+    boolean isAdjacent (int x, int y) {
+      if((x<0) || (y<0) || (x > (imageWidth-1)) || (y > (imageHeight-1))) {
+        if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+          println("Error at isNeighbor(int, int) : invalid input coordinates");
+        }
+        if(EXIT_AT_ERROR == 1) System.exit(-1);
+      }
+
+      calculateXY(); //recalculate pixel objects coordinates
+      if(!isPixelBlack(x, y)) return false;
+
+      else if(isFriend(x, y) || isNeighbor(x, y)) return true;
+      else return false;
+    }
+    //=========================================================================//
+  } //pixelObject ends
+
+  //=========================================================================//
+  //imgObject declarations and functions
+
+  PImage imageArray;
+  int imageWidth, imageHeight;
+  int blackPixelCount, edgePixelCount, nibPixelCount, nibPixelUsedCount, segmentCount;
+  int [] edgePixelArray;
+  int [] nibPixelArray;
+  int [] segmentArray;
+  int [] segmentMarkerArray;
+  int [] ignoredPixelArray;
+  int segmentMarkerCount, segmentEndMarkerCount, segmentStartMarkerCount, segmentPointMarkerCount, redundantMarkerCount;
+  int ignoredPixelCount, imageXIndexLimit, imageYIndexLimit, segmentArrayLength;
+  int [] loopCounter = new int [10];
+  pixelObject currentPixel, prevPixel, lastStartPixel, lastEndPixel, lastPointPixel, lastNibPixel;
+  boolean isTracingCompleted, scanningFinished, scanningError, edgeDetected, nibDetected;
+
+  //=========================================================================//
+  //accepts image path
+
+  imgObject (String imageName) {
+    imageArray = loadImage(imageName);
+    initImgObject();
+  }
+
+  //-------------------------------------------------------------------------//
+  //acceptss an inbuilt PImage object
+
+  imgObject (PImage sourceImageArray) {
+    imageArray = sourceImageArray;
+    initImgObject();
+  }
+
+  //-------------------------------------------------------------------------//
+  //accepts another imgObject
+
+  imgObject (imgObject sourceImage) {
+    imageArray = sourceImage.imageArray;
+    initImgObject();
+  }
+
+  //-------------------------------------------------------------------------//
+  //creates image with default sizes
+  imgObject () {
+    imageArray = createImage(DEFAULT_IMAGE_WIDTH, DEFAULT_IMAGE_HEIGHT, RGB);
+    initImgObject();
+  }
+  //=========================================================================//
+  //initialize rest of the object elements
+
+  void initImgObject () {
+    imageHeight = imageArray.height;
+    imageWidth = imageArray.width;
+    edgePixelArray = new int [imageWidth * imageHeight]; //array for outline
+    nibPixelArray = new int [imageWidth * imageHeight]; //array for EOF pixels
+    segmentArray = new int [imageWidth * imageHeight]; //array for segments
+    segmentMarkerArray = new int [imageWidth * imageHeight];
+    imageXIndexLimit = imageWidth - 1;
+    imageYIndexLimit = imageHeight - 1;
+    blackPixelCount = 0;
+    edgePixelCount = 0;
+    nibPixelCount = 0;
+    nibPixelUsedCount = 0;
+    segmentCount = 0;
+    segmentMarkerCount = 0;
+    segmentStartMarkerCount = 0;
+    segmentEndMarkerCount = 0;
+    segmentPointMarkerCount = 0;
+    segmentArrayLength = 0;
+    isTracingCompleted = true;
+    scanningFinished = false;
+    scanningError = false;
+    edgeDetected = false;
+    nibDetected = false;
+    lastStartPixel = new pixelObject();
+    lastEndPixel = new pixelObject();
+    lastPointPixel = new pixelObject();
+    currentPixel = new pixelObject();
+    prevPixel = new pixelObject();
+    findBlackPixels();
+  }
+  //=========================================================================//
+  //finds edge pixels from a bitmap/png image and stores them to an array
+
+  public int findEdgePixels () {
+    edgePixelCount = 0;
+    edgeDetected = false;
+    for(int y=0; y<imageHeight; y++) {
+      for(int x=0; x<imageWidth; x++) {
+        if(isEdgePixel(x, y)) { //edge of a solid fill
+          edgePixelArray [edgePixelCount] = convertToPosition(x, y); //mark that pixel
+          edgePixelCount++;
+          //println("Edge pixel found : " + "X = " + x + ", Y = " + y + ", N = " + getNeighborsCount(x,y) + ", F = " + getFriendsCount(x,y));
+        }
+      }
+    }
+    if(DEBUG_LEVEL <= SEVERITY_INFO) {
+      println("Edge pixel count = " + edgePixelCount);
+      if(DEBUG_LEVEL <= SEVERITY_VERBOSE) {
+        printVerbose();
+      }
+    }
+    edgeDetected = true;
+    return edgePixelCount;
+  }
+  //=========================================================================//
+  //finds end of line pixels from a bitmap/png image and stores them to an array
+
+  public int findNibPixels () {
+    nibPixelCount = 0;
+    nibDetected = false;
+    for(int y=0; y<imageHeight; y++) {
+      for(int x=0; x<imageWidth; x++) {
+        if(isNibPixel(x, y)) { //edge of a solid fill
+          nibPixelArray [nibPixelCount] = convertToPosition(x, y);
+          nibPixelCount++;
+          //println("End pixel found : " + "X = " + x + ", Y = " + y + ", N = " + getNeighborsCount(x,y) + ", F = " + getFriendsCount(x,y));
+        }
+      }
+    }
+    if(DEBUG_LEVEL <= SEVERITY_INFO) {
+      println("End pixel count = " + nibPixelCount);
+    }
+    nibDetected = true;
+    return nibPixelCount;
+  }
+
+  //=========================================================================//
+  //finds all the black pixels in an image
+
+  public int findBlackPixels () {
+    blackPixelCount = 0;
+    for(int y=0; y<imageHeight; y++) {
+      for(int x=0; x<imageWidth; x++) {
+        if(isPixelBlack(x, y)) { //edge of a solid fill
+          blackPixelCount++;
+        }
+      }
+    }
+    if(DEBUG_LEVEL <= SEVERITY_INFO) {
+      println("Black pixel count = " + blackPixelCount);
+    }
+    return blackPixelCount; //total count
+  }
+  //=========================================================================//
+  //finds curved and straight lines, loops and other segments in the image
+  //saves them to a 1D array ready to be processed by the plotting function
+
+  public int findSegments () {
+    segmentCount = 0;
+    findNibPixels();
+    findEdgePixels();
+    if(DEBUG_LEVEL <= SEVERITY_INFO) {
+      println("Finding segments..");
+    }
+
+    while((segmentArrayLength < (edgePixelCount+redundantMarkerCount)) && (!scanningError) && (!scanningFinished)) { //loop until all the black pixels are fetched
+      if((isTracingCompleted) && (!scanningError) && (!scanningFinished)) { //we only need to do this if an end marker was set or we're just starting scanning
+        if((nibPixelCount > nibPixelUsedCount) && (!scanningError) && (!scanningFinished)) { //nibs are used as start pixels
+          currentPixel.set(nibPixelArray[nibPixelUsedCount]); //set current as one of the nib pixes
+          if(DEBUG_LEVEL <= SEVERITY_MESSAGE) {
+            println();
+            println("Pixel update 01 : P = " + currentPixel.position + ", X = " + currentPixel.X + ", Y = " + currentPixel.Y);
+          }
+          segmentArray[segmentArrayLength] = nibPixelArray[nibPixelUsedCount]; //copy the nib pixel to segment array
+          segmentMarkerArray[segmentArrayLength] = START_MARKER; //add marker to segment marker array
+          prevPixel.set(segmentArray[segmentArrayLength]); //set the current pixel as prev pixel
+          lastStartPixel.set(segmentArray[segmentArrayLength]); //last start position is now current pixel
+          segmentArrayLength++; //segment array has advanced one position
+          segmentStartMarkerCount++; //so these
+          segmentMarkerCount++;
+          nibPixelUsedCount += 2; //becasue nib pixel array stores start and end pixels as [S, E, S, E..]
+          if(DEBUG_LEVEL <= SEVERITY_VERBOSE) {
+            printVerbose();
+          }
+
+
+          //if((segmentArray[segmentArrayLength-1] < 0) || (segmentArray[segmentArrayLength-1] > ((imageWidth * imageHeight)-1))) {
+          if(segmentArray[segmentArrayLength-1] < 0) { //segmentArrayLength can now be greater than total number of pixels
+            if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+              println("Error : Corrupted segment array!");
+              println("Invalid co-ordinates found in segment array.");
+              println("Program will now terminate.");
+            }
+            if(EXIT_AT_ERROR == 1) System.exit(-1);
+          }
+        }
+
+        //when there's no more black pixels to scan
+        else if((!scanningError) && (!scanningFinished)){
+          if(getFirstBlackPixel() == INVALID) {
+            scanningFinished = true; //finish the scanning
+            isTracingCompleted = true;
+            if(segmentMarkerArray[segmentMarkerCount] != END_MARKER) {
+              segmentMarkerArray[segmentMarkerCount] = END_MARKER; //mark the end of segment
+              lastEndPixel.set(segmentArray[segmentArrayLength]);
+              segmentMarkerCount++;
+              segmentEndMarkerCount++;
+              segmentArrayLength++;
+              segmentCount++;
+            }
+            if(DEBUG_LEVEL <= SEVERITY_VERBOSE) {
+              printVerbose();
+            }
+          }
+
+          else { //if there are still black pixels
+            //if there are no nib pixels, we could use the first unmarked pixel from the edge pixel array
+            currentPixel.set(getFirstBlackPixel()); //find the first black pixel which need not to be a nib pixel
+            if(DEBUG_LEVEL <= SEVERITY_MESSAGE) {
+              println();
+              println("Pixel update 02 : P = " + currentPixel.position + ", X = " + currentPixel.X + ", Y = " + currentPixel.Y);
+            }
+            segmentArray[segmentArrayLength] = currentPixel.getPosition(); //save it to segment array
+            segmentMarkerArray[segmentArrayLength] = START_MARKER; //it's a starting point
+            prevPixel.set(segmentArray[segmentArrayLength]); //save as previous pixel
+            lastStartPixel.set(segmentArray[segmentArrayLength]); //also as start pixel
+            segmentArrayLength++;
+            segmentMarkerCount++;
+            segmentStartMarkerCount++;
+            if(DEBUG_LEVEL <= SEVERITY_VERBOSE) {
+              printVerbose();
+            }
+          }
+        }
+      }
+
+      //currentPixel is a temp pixel object for pixel manipulation
+      //at start, current pixel will be start pixel
+      if((!scanningError) && (!scanningFinished)) { //we check for errors all the time because it could happen any time!
+        if(getFirstAdjacentPixel() == INVALID) {
+          if(getFirstBlackPixel() == INVALID) {
+            isTracingCompleted = true;
+            scanningFinished = true;
+            segmentMarkerArray[segmentArrayLength] = END_MARKER; //it's a starting point
+            prevPixel.set(segmentArray[segmentArrayLength]); //save as previous pixel
+            lastEndPixel.set(segmentArray[segmentArrayLength]); //also as start pixel
+            segmentArrayLength++;
+            segmentMarkerCount++;
+            segmentEndMarkerCount++;
+            if(DEBUG_LEVEL <= SEVERITY_VERBOSE) {
+              printVerbose();
+            }
+          }
+
+          else {
+            currentPixel.set(getFirstBlackPixel()); //find the first black pixel which need not to be a nib pixel
+            if(DEBUG_LEVEL <= SEVERITY_MESSAGE) {
+              println();
+              println("Pixel update 10 : P = " + currentPixel.position + ", X = " + currentPixel.X + ", Y = " + currentPixel.Y);
+            }
+            segmentArray[segmentArrayLength] = currentPixel.getPosition(); //save it to segment array
+            segmentMarkerArray[segmentArrayLength] = START_MARKER; //it's a starting point
+            prevPixel.set(segmentArray[segmentArrayLength]); //save as previous pixel
+            lastStartPixel.set(segmentArray[segmentArrayLength]); //also as start pixel
+            segmentArrayLength++;
+            segmentMarkerCount++;
+            segmentStartMarkerCount++;
+            if(DEBUG_LEVEL <= SEVERITY_VERBOSE) {
+              printVerbose();
+            }
+          }
+        }
+        else {
+          currentPixel.set(getFirstAdjacentPixel()); //now we have a marker set, let's find the next pixel
+          if(DEBUG_LEVEL <= SEVERITY_MESSAGE) {
+            println();
+            println("Pixel update 03 : P = " + currentPixel.position + ", X = " + currentPixel.X + ", Y = " + currentPixel.Y);
+          }
+          if(DEBUG_LEVEL <= SEVERITY_VERBOSE) {
+            printVerbose();
+          }
+        }
+      }
+
+      //if we find a nib pixel
+      if((isNibPixel(currentPixel)) && (isEdgePixel(currentPixel)) && (!scanningError) && (!scanningFinished)) { //send as object
+        segmentArray[segmentArrayLength] = currentPixel.getPosition(); //save tehe pixel to the segment array
+        segmentMarkerArray[segmentArrayLength] = END_MARKER; //mark it as END
+        prevPixel.set(currentPixel.getPosition()); //save as prev pixel
+        lastEndPixel.set(currentPixel.getPosition()); //we found an end pixel
+        isTracingCompleted = true; //tracing is fully scanning a single segment
+        segmentArrayLength++;
+        segmentMarkerCount++;
+        segmentEndMarkerCount++;
+        segmentCount++;
+        if(DEBUG_LEVEL <= SEVERITY_VERBOSE) {
+          printVerbose();
+        }
+      }
+
+      //if the getFirstAdjacentPixel() return an already marked pixel
+      else if((isMarked(currentPixel)) && (isEdgePixel(currentPixel)) && (!scanningError) && (!scanningFinished)) { //check if currentPixel (object) is already marked
+        if(lastStartPixel.position == prevPixel.position) { //the last start pixel has nowhere to connect
+          segmentArray[segmentArrayLength] = currentPixel.getPosition(); //save the already mared pixel to the segment array
+          segmentMarkerArray[segmentArrayLength] = END_MARKER; //mark it as END
+          prevPixel.set(currentPixel.getPosition()); //save as prev pixel
+          lastEndPixel.set(currentPixel.getPosition()); //we found an end pixel
+          isTracingCompleted = true; //tracing is fully scanning a single segment
+          segmentArrayLength++;
+          segmentMarkerCount++;
+          segmentEndMarkerCount++;
+          redundantMarkerCount++; //becasue we used an already marked pixel as an end pixel
+          segmentCount++;
+          //at the end we'll have a segment wil only two pixels; one start and one end
+          if(DEBUG_LEVEL <= SEVERITY_VERBOSE) {
+            printVerbose();
+          }
+        }
+
+        //otherwise it could be an end of loop
+        else if (isEdgePixel(currentPixel)){
+          segmentMarkerArray[segmentArrayLength-1] = END_MARKER; //it's not an end pixel but an end of loop
+          lastEndPixel.set(segmentArray[segmentArrayLength-1]);
+          currentPixel.set(prevPixel.position); //set current pixel to previous pixel : from postion value
+          if(DEBUG_LEVEL <= SEVERITY_MESSAGE) {
+            println();
+            println("Pixel update 05 : P = " + currentPixel.position + ", X = " + currentPixel.X + ", Y = " + currentPixel.Y);
+          }
+          isTracingCompleted = true; //completed a segment
+          segmentPointMarkerCount -= 1; //becasue we've just used a previously marked point pixel as end pixel (no change in segmentArraylength)
+          segmentEndMarkerCount++;
+          segmentCount++;
+          if(DEBUG_LEVEL <= SEVERITY_VERBOSE) {
+            printVerbose();
+          }
+        }
+      }
+
+      //finally we check if the pixel is a point in line (not start or end)
+      else if((isEdgePixel(currentPixel)) && (!scanningError) && (!scanningFinished)) { //just to make sure that it's apoint in a line
+        segmentArray[segmentArrayLength] = currentPixel.getPosition();
+        segmentMarkerArray[segmentArrayLength] = POINT_MARKER;
+        prevPixel.set(currentPixel.getPosition());
+        isTracingCompleted = false;
+        segmentArrayLength++;
+        segmentMarkerCount++;
+        segmentPointMarkerCount++;
+      }
+    } //while ends
+
+    if(!scanningError) {
+       if(segmentMarkerArray[segmentMarkerCount-1] != END_MARKER) {
+         segmentMarkerArray[segmentMarkerCount-1] = END_MARKER;
+         lastEndPixel.set(segmentArray[segmentArrayLength-1]);
+         segmentEndMarkerCount++;
+         segmentPointMarkerCount--;
+         segmentCount++;
+       }
+       if(DEBUG_LEVEL <= SEVERITY_INFO) {
+         println();
+         println("--- Scanning Finished ----");
+      }
+       if(DEBUG_LEVEL <= SEVERITY_VERBOSE) {
+         printVerbose();
+       }
+       return segmentCount;
+     }
+     else return INVALID;
+   }
+  //=========================================================================//
+  //prints all the variable values and flag status
+
+  public void printVerbose () {
+    println();
+    println("Current Pixel : P = " + currentPixel.position + ", X = " + currentPixel.X + ", Y = " + currentPixel.Y);
+    println("Prev Pixel : P = " + prevPixel.position + ", X = " + prevPixel.X + ", Y = " + prevPixel.Y);
+    println("Last Start Pixel : P = " + lastStartPixel.position);
+    println("Last End Pixel : P = " + lastEndPixel.position);
+    println("isPixelBlack = " + isPixelBlack(currentPixel.position));
+    println("isNibPixel = " + isNibPixel(currentPixel.position));
+    println("isEdgePixel = " + isEdgePixel(currentPixel.position));
+    println("isMarked = " + isMarked(currentPixel.position));
+    println("Black Pixel Count = " + blackPixelCount);
+    println("Nib Pixel Count = " + nibPixelCount);
+    println("Nib Used Pixel Count = " + nibPixelUsedCount);
+    println("Edge Pixel Count = " + edgePixelCount);
+    println("Segment Array Length = " + segmentArrayLength);
+    println("Segment Count = " + segmentCount);
+    println("Segment Marker Count = " + segmentMarkerCount);
+    println("Segment Start Marker Count = " + segmentStartMarkerCount);
+    println("Segment End Marker Count = " + segmentEndMarkerCount);
+    println("Segment Point Marker Count = " + segmentPointMarkerCount);
+    println("Segment Redundant Marker Count = " + redundantMarkerCount);
+  }
+  //=========================================================================//
+  //returns first unmarked black pixel in the image
+
+  int getFirstBlackPixel () {
+    for(int y=0; y<imageHeight; y++) {
+      for(int x=0; x<imageWidth; x++) {
+        if((isEdgePixel(x, y)) && (!isMarked(x, y))) {
+          return (x + (y * imageWidth));
+        }
+      }
+    }
+    if(DEBUG_LEVEL <= SEVERITY_WARNING) {
+      println();
+      println("Error at getFirstBlackPixel() : Couldn't find any pixels!");
+    }
+    return INVALID;
+  }
+  //=========================================================================//
+  //checks if a pixel was already marked
+
+  boolean isMarked (int x, int y) {
+    int pixelPosition = (x + (y * imageWidth));
+    if(segmentArrayLength == 0)
+      return false;
+    else {
+      for(int i=0; i<segmentArrayLength; i++) {
+        if(segmentArray[i] == pixelPosition)
+          return true;
+      }
+      return false;
+    }
+  }
+
+  //-------------------------------------------------------------------------//
+
+  boolean isMarked (int pixelPosition) {
+    int x = (pixelPosition % imageWidth); //calculate X from position
+    int y = (pixelPosition - (pixelPosition % imageWidth)) / imageWidth; //calculate Y from position
+    return isMarked(x, y);
+  }
+
+  //-------------------------------------------------------------------------//
+
+  boolean isMarked (pixelObject sourceObject) {
+    return isMarked(sourceObject.X, sourceObject.Y);
+  }
+  //=========================================================================//
+  //determines if a pixel is a point in line
+
+  boolean isPointPixel(int x, int y) {
+    if(((getNeighborsCount(x, y) + getFriendsCount(x, y)) == 2) && isEdgePixel(x,y))
+      return true;
+    else return false;
+  }
+
+  //-------------------------------------------------------------------------//
+
+  boolean isPointPixel(int pixelPosition) {
+    int x = (pixelPosition % imageWidth); //calculate X from position
+    int y = (pixelPosition - (pixelPosition % imageWidth)) / imageWidth; //calculate Y from position
+    return isPointPixel(x, y);
+  }
+
+  //-------------------------------------------------------------------------//
+
+  boolean isPointPixel(pixelObject sourceObject) {
+    return isPointPixel(sourceObject.X, sourceObject.Y);
+  }
+  //=========================================================================//
+  //finds the first adjacent friend of a pixel
+
+  int getFirstAdjacentFriend (int position) {
+    return INVALID;
+  }
+  //=========================================================================//
+  //finds first adjacent neighbor of a pixel
+
+  int getFirstAdjacentNeighbor (int position) {
+    return INVALID;
+  }
+  //=========================================================================//
+  //checks if one of the surrounding pixel is black and then returns the
+  //relative position which can be 0 to 8. If found, returns the first one
+  //intercepted in a clockwise rotation. Whenever we refer to "pixel" or
+  //"PIXEL", the pixel is assumed to be black.
+
+  public int getFirstAdjacentPixel () {
+    //println("At getFirstAdjacentPixel() : currentPixel X = " + currentPixel.X + " Y = " + currentPixel.Y);
+    return getFirstAdjacentPixel(currentPixel.X, currentPixel.Y);
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public int getFirstAdjacentPixel (int position) {
+    //convert to x, y and send it
+    return getFirstAdjacentPixel((position % imageWidth), ((position - (position % imageWidth)) / imageWidth));
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public int getFirstAdjacentPixel (pixelObject a) {
+    a.calculateXY();
+    return getFirstAdjacentPixel(a.X, a.Y);
+    //return getFirstAdjacentPixel((a.position % imageWidth), ((a.position - (a.position % imageWidth)) / imageWidth));
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public int getFirstAdjacentPixel (int x, int y) {
+    if(!isPixelValid(x, y)) {
+      if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+        println();
+        println("Invalid pixel coordinates at getFirstAdjacentPixel(int, int) " + "X = " + x + " Y = " + y);
+      }
+      if(EXIT_AT_ERROR == 1) System.exit(-1);
+      return INVALID;
+    }
+
+    else if(isPixelBlack(x, y))  { //check if it's a black pixel anyway
+      for(int i=0; i<8; i++) { //to find unmarked pixels
+        int X = x + scanningPatternX[i]; //calculate the coordinates of adjacent pixels using the predefined scanning pattern
+        int Y = y + scanningPatternY[i];
+        if(isPixelValid(X, Y) && isPixelBlack(X, Y) && isEdgePixel(X, Y)) { //check also if edge pixel
+          if(!isMarked(X, Y)) { //if not marked
+            return convertToPosition(X, Y);
+          }
+        }
+      }
+
+      for(int i=0; i<8; i++) { //if there's no unmarked pixels, then retrun a marked one
+        int X = x + scanningPatternX[i];//calculate the coordinates of adjacent pixels using the predefined scanning pattern
+        int Y = y + scanningPatternY[i];
+        if(isPixelValid(X, Y) && isPixelBlack(X, Y) && isEdgePixel(X, Y)) {
+          return convertToPosition(X, Y); //no need to check for unmarked
+        }
+      }
+    }
+    return INVALID;
+  }
+  //=========================================================================//
+  //converts X,Y coordinates to position in the image array
+
+  public int convertToPosition (int x, int y) {
+    return (x + (y * imageWidth));
+  }
+  //=========================================================================//
+  //determines if a pixel is black and is at the edge of the image or at the
+  //edge of any solif shape
+
+  public boolean isEdgePixel (pixelObject sourceObject) {
+    return isEdgePixel(sourceObject.X, sourceObject.Y);
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public boolean isEdgePixel(int position) {
+    return isEdgePixel((position % imageWidth), ((position - (position % imageWidth)) / imageWidth));
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public boolean isEdgePixel (int x, int y) {
+    if(!isPixelValid(x, y)) {
+      if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+        println();
+        println("Error : Invalid pixel coordinates at isEdgePixel(int, int) " + "X = " + x + " Y = " + y);
+        println("Program will now terminate.");
+      }
+      if(EXIT_AT_ERROR == 1) System.exit(-1);
+      return false;
+    }
+
+    if(edgeDetected) {
+      int position = convertToPosition(x, y);
+      for(int i=0; i<edgePixelCount; i++) {
+        if(edgePixelArray[i] == position)
+          return true;
+      }
+      return false;
+    }
+
+    else if(isPixelBlack(x, y)) { //if a pixel is black
+      if(isBorderPixel(x, y)) //if the pixel is already at image border
+        return true;
+
+      else {
+        if((getFriendsCount(x, y) < 4) || isPointPixel(x, y)) return true;
+        else return false;
+      }
+    }
+    else return false;
+  }
+  //=========================================================================//
+  //determines if a pixel is end of a line segment
+
+  public boolean isNibPixel (pixelObject sourceObject) {
+    return isNibPixel(sourceObject.X, sourceObject.Y);
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public boolean isNibPixel(int position) {
+    return isNibPixel((position % imageWidth), ((position - (position % imageWidth)) / imageWidth));
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public boolean isNibPixel (int x, int y) {
+    if(!isPixelValid(x, y)) {
+      if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+        println();
+        println("Error : Invalid pixel coordinates at isNibPixel(int, int) " + "X = " + x + " Y = " + y);
+        println("Program will now terminate.");
+      }
+      if(EXIT_AT_ERROR == 1) System.exit(-1);
+      return false;
+    }
+
+    if(nibDetected) {
+      int position = convertToPosition(x, y);
+      for(int i=0; i<nibPixelCount; i++) {
+        if(nibPixelArray[i] == position)
+          return true;
+      }
+      return false;
+    }
+
+    else if(isPixelBlack(x, y) && isEdgePixel(x, y)) {
+      if((getNeighborsCount(x, y) + getFriendsCount(x,y)) == 1) //only one neighbor or friend
+        return true;
+      else return false;
+    }
+    else return false;
+  }
+  //=========================================================================//
+  //gets the number of friends of a pixel
+
+  public int getFriendsCount(pixelObject sourceObject) {
+    return getFriendsCount(sourceObject.X, sourceObject.Y);
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public int getFriendsCount (int x, int y) {
+    int friendPixelCount = 0;
+
+    if(!isPixelValid(x, y)) {
+      if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+        println();
+        println("Error : Invalid pixel coordinates at getFriendsCount() " + "X = " + x + " Y = " + y);
+        println("Program will now terminate.");
+      }
+      if(EXIT_AT_ERROR == 1) System.exit(-1);
+      return INVALID;
+    }
+
+    for(int i=0; i<4; i++) { //assuming first four entries of scanning pattern are friends
+      int X = x + scanningPatternX[i];
+      int Y = y + scanningPatternY[i];
+      if(isPixelValid(X, Y) && isPixelBlack(X, Y)) {
+        friendPixelCount++;
+      }
+    }
+    return friendPixelCount;
+  }
+  //=========================================================================//
+  //gets the number of neighbors (black) of a pixel
+
+  public int getNeighborsCount(pixelObject sourceObject) {
+    return getNeighborsCount(sourceObject.X, sourceObject.Y);
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public int getNeighborsCount (int x, int y) {
+    int neighborPixelCount = 0;
+
+    if(!isPixelValid(x, y)) {
+      if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+        println();
+        println("Error : Invalid pixel coordinates at getNeighborsCount(int, int) " + "X = " + x + " Y = " + y);
+        println("Program will now terminate.");
+      }
+      if(EXIT_AT_ERROR == 1) System.exit(-1);
+      return INVALID;
+    }
+
+    for(int i=4; i<8; i++) { //assuming last four in the scanning pattern are neighbors
+      int X = x + scanningPatternX[i];
+      int Y = y + scanningPatternY[i];
+      if(isPixelValid(X, Y) && isPixelBlack(X, Y)) {
+        neighborPixelCount++;
+      }
+    }
+    return neighborPixelCount;
+  }
+  //=========================================================================//
+  //determines if a pixel is either at  corner or border of an image
+
+  public boolean isBorderPixel (int x, int y) {
+    if(!isPixelValid(x, y)) {
+      if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+        println();
+        println("Error : Invalid pixel coordinates at isBorderPixel(int, int) " + "X = " + x + " Y = " + y);
+        println("Program will now terminate.");
+      }
+      if(EXIT_AT_ERROR == 1) System.exit(-1);
+      return false;
+    }
+
+    if((y==0) || (x==0) || (y==imageYIndexLimit) || (x==imageXIndexLimit)) //check if pixel is at edge of image
+      return true;
+
+    else return false;
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public boolean isBorderPixel (int position) {
+    return isBorderPixel((position % imageWidth), ((position - (position % imageWidth)) / imageWidth));
+  }
+  //=========================================================================//
+  //determines if a pixel is at border of an image and is not a corner pixel
+
+  public boolean isSideBorderPixel (int x, int y) {
+    if(!isPixelValid(x, y)) {
+      if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+        println();
+        println("Error : Invalid pixel coordinates at isSideBorderPixel(int, int) " + "X = " + x + " Y = " + y);
+        println("Program will now terminate.");
+      }
+      if(EXIT_AT_ERROR == 1) System.exit(-1);
+      return false;
+    }
+
+    if (!isCornerPixel(x, y)) { //if not a corner pixel
+      if ((x==0) && (y<imageYIndexLimit)) //left border
+        return true;
+      else if ((y==0) && (x<imageXIndexLimit)) //top border
+       return true;
+      else if ((x==imageXIndexLimit) && (y<imageYIndexLimit)) //right border
+        return true;
+      else if ((y==imageYIndexLimit) && (x<imageXIndexLimit)) //bottom border
+        return true;
+      else return false;
+    }
+    else return false; //if a corner pixel
+  }
+  //=========================================================================//
+  //determines if a pixel is at either of the 4 corners of the image
+
+  public boolean isCornerPixel (int x, int y) {
+    if(!isPixelValid(x, y)) {
+      if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+        println();
+        println("Error : Invalid pixel coordinates at isCornerPixel() " + "X = " + x + " Y = " + y);
+        println("Program will now terminate.");
+      }
+      if(EXIT_AT_ERROR == 1) System.exit(-1);
+      return false;
+    }
+
+    if ((x==0) && (y==0))
+      return true;
+    else if ((x==0) && (y==imageYIndexLimit))
+      return true;
+    else if ((x==imageXIndexLimit) && (y==0))
+      return true;
+    else if ((y==imageYIndexLimit) && (x==imageXIndexLimit))
+      return true;
+    else return false;
+  }
+  //=========================================================================//
+  //checks if pixel coordinates are valid
+  public boolean isPixelValid (int position) {
+    return isPixelValid((position % imageWidth), ((position - (position % imageWidth)) / imageWidth));
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public boolean isPixelValid (pixelObject sourceObject) {
+    return isPixelValid(sourceObject.X, sourceObject.Y);
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public boolean isPixelValid (int x, int y) {
+    if((x<0) || (y<0) || (x>imageXIndexLimit) || (y>imageYIndexLimit)) {
+      return false;
+    }
+    else return true;
+  }
+  //=========================================================================//
+  //checks if a pixel in the image is black
+
+  public boolean isPixelBlack (int position) {
+    return isPixelBlack((position % imageWidth), ((position - (position % imageWidth)) / imageWidth));
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public boolean isPixelBlack (pixelObject sourceObject) {
+    return isNibPixel(sourceObject.X, sourceObject.Y);
+  }
+
+  //-------------------------------------------------------------------------//
+
+  public boolean isPixelBlack (int x, int y) {
+    if(!isPixelValid(x, y)) {
+      if(DEBUG_LEVEL <= SEVERITY_CRITICAL) {
+        println();
+        println("Error : Invalid pixel coordinates at isPixelBlack(int, int) " + "X = " + x + " Y = " + y);
+        println("Program will now terminate.");
+      }
+      if(EXIT_AT_ERROR == 1) System.exit(-1);
+      return false;
+    }
+
+    int pixelLocation = (x+(y*imageWidth)); //calculate the pixel location in the PImage array from cords
+    int pixelRed = (int) red(imageArray.pixels[pixelLocation]); //get red value of pixel
+    int pixelGreen = (int) green(imageArray.pixels[pixelLocation]); //get green value of pixel
+    int pixelBlue = (int) blue(imageArray.pixels[pixelLocation]); //get blue value of pixel
+
+    if ((pixelRed > 0) && (pixelGreen > 0) && (pixelBlue > 0)) { //check if white
+      return false;
+    }
+    else if ((pixelRed < 10) && (pixelGreen < 10) && (pixelBlue < 10)) { //check if black
+      return true;
+    }
+    else return false; //default return
+  }
+
+  //=========================================================================//
+  //creates an outline image containing only edge pixels generated by edge
+  //detection algorithm
+
+  boolean createOutlineImage () {
+    outlineImage = new imgObject(this);
+    outlineImage.imageArray = createImage(outlineImage.imageWidth, outlineImage.imageHeight, RGB); //create image
+    this.findEdgePixels(); //first find the edge pixels from source image
+    //println("Edge pixel count = " + sourceImage.edgePixelCount);
+    outlineImage.imageArray.loadPixels(); //load pixels for altering
+
+    for(int y=0; y<outlineImage.imageHeight; y++) {
+      for(int x=0; x<outlineImage.imageWidth; x++) {
+        int pixelLocation = (x+(y*(this.imageWidth))); //find the pixel location in PImage from coords
+        outlineImage.imageArray.pixels[pixelLocation] = color(255, 255, 255);
+      }
+    }
+
+    for(int i=0; i <this.edgePixelCount; i++) {
+      outlineImage.imageArray.pixels[this.edgePixelArray[i]] = color(0, 0, 0);
+    }
+    outlineImage.imageArray.updatePixels(); //update the image
+    return true;
+  }
+  //=========================================================================//
+  //simulates CNC drawing using the segment array
+
+  void simulateFreehand(int originX, int originY) {
+    int X, Y;
+
+    X = (selectedImage.segmentArray[loopCounter[0]] % imageWidth); //calculate X from position
+    Y = (selectedImage.segmentArray[loopCounter[0]] - (selectedImage.segmentArray[loopCounter[0]] % imageWidth)) / imageWidth; //calculate Y from position
+    point(originX+X, originY+Y);
+    if(loopCounter[0] <(selectedImage.segmentArrayLength-1)) loopCounter[0]++;
+  }
+
+  //=========================================================================//
+  //draws the image using the edge pixel array
+
+  void simulateImageEdge(int originX, int originY) {
+    int X, Y;
+
+    X = (selectedImage.edgePixelArray[loopCounter[1]] % imageWidth); //calculate X from position
+    Y = (selectedImage.edgePixelArray[loopCounter[1]] - (selectedImage.edgePixelArray[loopCounter[1]] % imageWidth)) / imageWidth; //calculate Y from position
+    point(originX+X, originY+Y);
+    if(loopCounter[1] <(selectedImage.edgePixelCount-1)) loopCounter[1]++;
+  }
+  //=========================================================================//
+} //imgObject class ends
+
+//=========================================================================//
 //uiButton defines interactive buttons with hover, press and click effects.
 //a button can be associated with a label defined by uiButtonLabel
 
@@ -468,7 +1631,7 @@ int pixelRed; //red value of a pixel
 int pixelGreen; //green value of a pixel
 int pixelBlue; //blue value of a pixel
 
-boolean pixelColor = false; //stores color of a pixel as bool. true = black, false = white or transparent
+boolean pixelIsBlack = false; //stores color of a pixel as bool. true = black, false = white or transparent
 boolean prevPixelColor = true; //same as pixelColor
 PImage imageSelected; //selected image object
 String imageFilePath;
@@ -964,7 +2127,7 @@ void displayAboutWindow() {
     setTextProperties(poppinsFont, 13);
     displayText("This is a control software designed for drawing graphics with", colorMediumBlack, ALIGN_CENTER, 120, 125, 100, 550);
     displayText("CNC plotters made from CD stepper drives.", colorMediumBlack, ALIGN_CENTER, 145, 125, 100, 550);
-    displayText("The software is designed in ", "Processing.", colorMediumBlack, colorBlue, ALIGN_CENTER, 170, 125, 100, 550);
+    displayText("The software is developed with ", "Processing.", colorMediumBlack, colorBlue, ALIGN_CENTER, 170, 125, 100, 550);
     displayText("Full tutorial is available at author's website.", colorMediumBlack, ALIGN_CENTER, 195, 125, 100, 550);
     setTextProperties(poppinsFont, 13);
     displayText("Version : ", VERSION_NUMBER, colorMediumBlack, colorBlue, ALIGN_CENTER, 247, 125, 100, 550);
@@ -972,7 +2135,7 @@ void displayAboutWindow() {
     displayText("License : ", "MIT License, Copyright © 2017  Vishnu M Aiea", colorMediumBlack, colorBlue, ALIGN_CENTER, 297, 125, 100, 550);
     displayText("Release date : ", RELEASE_DATE, colorMediumBlack, colorBlue, ALIGN_CENTER, 322, 125, 100, 550);
     displayText("GitHub : ", SOURCE_WEBSITE, colorMediumBlack, colorBlue, ALIGN_CENTER, 347, 125, 100, 550);
-    displayText("Author's Wesbite : ", AUTHOR_WEBSITE, colorMediumBlack, colorBlue, ALIGN_CENTER, 372, 125, 100, 550);
+    displayText("Author's Website : ", AUTHOR_WEBSITE, colorMediumBlack, colorBlue, ALIGN_CENTER, 372, 125, 100, 550);
 
     backButton.display();
     if (backButton.isClicked())
@@ -1737,7 +2900,7 @@ boolean countLines() {
     lineCount = 0;
     for (int y=0; y<imageHeight; y++) { //loop until image height or rows
       for (int x=0; x<imageWidth; x++) { //loop until image width or columns
-        pixelColor = isPixelBlack(x, y); //get the color of the pixel
+        pixelIsBlack = isPixelBlack(x, y); //get the color of the pixel
 
         if (x==0) { //if cords are starting of any row
           prevPixelColor = false; //prev pixel color is true = black
@@ -1753,7 +2916,7 @@ boolean countLines() {
           println(lineCords[0][0].length);
         }
 
-        if ((pixelColor) && ((x==0) || (!prevPixelColor))) { //if pixel color is black AND (there's no prev pixel OR prev pixel is white)
+        if ((pixelIsBlack) && ((x==0) || (!prevPixelColor))) { //if pixel color is black AND (there's no prev pixel OR prev pixel is white)
           if(ifToMirror) {
             lineCords[0][0][lineCount] = x; //x cord of starting of a line
             lineCords[0][1][lineCount] = y; //y cord of starting of a line
@@ -1764,7 +2927,7 @@ boolean countLines() {
           }
         }
 
-        if ((!pixelColor) && (prevPixelColor)) { //if pixel color is white AND prev pixel color is black
+        if ((!pixelIsBlack) && (prevPixelColor)) { //if pixel color is white AND prev pixel color is black
           if(ifToMirror) {
             lineCords[1][0][lineCount] = x-1; //x cord of ending of a line
             lineCords[1][1][lineCount] = y; //y cord of ending of a line
@@ -1777,7 +2940,7 @@ boolean countLines() {
           }
         }
 
-        if ((pixelColor) && (x==(imageWidth-1))) { //if pixel is black but at the end of any row
+        if ((pixelIsBlack) && (x==(imageWidth-1))) { //if pixel is black but at the end of any row
           if(ifToMirror) {
             lineCords[1][0][lineCount] = x; //x cord of ending of a line
             lineCords[1][1][lineCount] = y; //y cord of ending of a line
